@@ -17,7 +17,8 @@ export const hasStrokeColor = (type: ElementOrToolType) =>
   type === "arrow" ||
   type === "line" ||
   type === "text" ||
-  type === "embeddable";
+  type === "embeddable" ||
+  type === "image";
 
 export const hasStrokeWidth = (type: ElementOrToolType) =>
   type === "rectangle" ||
@@ -27,7 +28,8 @@ export const hasStrokeWidth = (type: ElementOrToolType) =>
   type === "diamond" ||
   type === "freedraw" ||
   type === "arrow" ||
-  type === "line";
+  type === "line" ||
+  type === "image";
 
 export const hasStrokeStyle = (type: ElementOrToolType) =>
   type === "rectangle" ||
@@ -36,7 +38,8 @@ export const hasStrokeStyle = (type: ElementOrToolType) =>
   type === "ellipse" ||
   type === "diamond" ||
   type === "arrow" ||
-  type === "line";
+  type === "line" ||
+  type === "image";
 
 export const canChangeRoundness = (type: ElementOrToolType) =>
   type === "rectangle" ||

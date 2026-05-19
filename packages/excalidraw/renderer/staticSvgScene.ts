@@ -32,7 +32,7 @@ import { getContainingFrame } from "@excalidraw/element";
 
 import { getCornerRadius, isPathALoop } from "@excalidraw/element";
 
-import { ShapeCache } from "@excalidraw/element";
+import { ShapeCache, getDashArrayDashed, getDashArrayDotted } from "@excalidraw/element";
 
 import { getElementAbsoluteCoords } from "@excalidraw/element";
 
@@ -583,6 +583,57 @@ const renderElementToSvg = (
           addToRoot(clipPath, element);
 
           g.setAttributeNS(SVG_NS, "clip-path", `url(#${clipPath.id})`);
+        }
+
+        // 绘制图片描边（SVG 导出）
+        if (
+          element.strokeColor !== "transparent" &&
+          element.strokeWidth > 0
+        ) {
+          const strokeRect = svgRoot.ownerDocument.createElementNS(
+            SVG_NS,
+            "rect",
+          );
+          const strokeColor =
+            renderConfig.theme === THEME.DARK
+              ? applyDarkModeFilter(element.strokeColor)
+              : element.strokeColor;
+
+          strokeRect.setAttribute("x", "0");
+          strokeRect.setAttribute("y", "0");
+          strokeRect.setAttribute("width", `${element.width}`);
+          strokeRect.setAttribute("height", `${element.height}`);
+          strokeRect.setAttribute("fill", "none");
+          strokeRect.setAttribute("stroke", strokeColor);
+          strokeRect.setAttribute(
+            "stroke-width",
+            element.strokeStyle !== "solid"
+              ? `${element.strokeWidth + 0.5}`
+              : `${element.strokeWidth}`,
+          );
+
+          if (element.strokeStyle === "dashed") {
+            strokeRect.setAttribute(
+              "stroke-dasharray",
+              getDashArrayDashed(element.strokeWidth).join(", "),
+            );
+          } else if (element.strokeStyle === "dotted") {
+            strokeRect.setAttribute(
+              "stroke-dasharray",
+              getDashArrayDotted(element.strokeWidth).join(", "),
+            );
+          }
+
+          if (element.roundness) {
+            const radius = getCornerRadius(
+              Math.min(element.width, element.height),
+              element,
+            );
+            strokeRect.setAttribute("rx", `${radius}`);
+            strokeRect.setAttribute("ry", `${radius}`);
+          }
+
+          g.appendChild(strokeRect);
         }
 
         const clipG = maybeWrapNodesInFrameClipPath(

@@ -163,11 +163,11 @@ export class ShapeCache {
   };
 }
 
-const getDashArrayDashed = (strokeWidth: number) => [8, 8 + strokeWidth];
+export const getDashArrayDashed = (strokeWidth: number) => [8, 8 + strokeWidth];
 
-const getDashArrayDotted = (strokeWidth: number) => [1.5, 6 + strokeWidth];
+export const getDashArrayDotted = (strokeWidth: number) => [1.5, 6 + strokeWidth];
 
-function adjustRoughness(element: ExcalidrawElement): number {
+export function adjustRoughness(element: ExcalidrawElement): number {
   const roughness = element.roughness;
 
   const maxSize = Math.max(element.width, element.height);
@@ -230,7 +230,8 @@ export const generateRoughOptions = (
     case "iframe":
     case "embeddable":
     case "diamond":
-    case "ellipse": {
+    case "ellipse":
+    case "image": {
       options.fillStyle = element.fillStyle;
       options.fill = isTransparent(element.backgroundColor)
         ? undefined

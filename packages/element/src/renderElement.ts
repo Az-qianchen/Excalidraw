@@ -66,7 +66,7 @@ import {
 import { getContainingFrame } from "./frame";
 import { getCornerRadius } from "./utils";
 
-import { ShapeCache } from "./shape";
+import { ShapeCache, generateRoughOptions, getDashArrayDashed, getDashArrayDotted } from "./shape";
 
 import type {
   ExcalidrawElement,
@@ -541,6 +541,36 @@ const drawElementOnCanvas = (
         drawImagePlaceholder(element, context, renderConfig.theme);
       }
       context.restore();
+
+      // 绘制图片描边
+      if (
+        element.strokeColor !== "transparent" &&
+        element.strokeWidth > 0
+      ) {
+        context.save();
+        const isDarkMode = renderConfig.theme === THEME.DARK;
+        const strokeColor = isDarkMode
+          ? applyDarkModeFilter(element.strokeColor)
+          : element.strokeColor;
+        const radius = element.roundness
+          ? getCornerRadius(Math.min(element.width, element.height), element)
+          : 0;
+
+        // 生成圆角矩形路径（SVG 格式），供 roughjs 使用
+        const w = element.width;
+        const h = element.height;
+        const r = Math.min(radius, w / 2, h / 2);
+        const path = `M${r},0 L${w - r},0 Q${w},0 ${w},${r} L${w},${h - r} Q${w},${h} ${w - r},${h} L${r},${h} Q0,${h} 0,${h - r} L0,${r} Q0,0 ${r},0 Z`;
+
+        rc.path(path, {
+          ...generateRoughOptions(element, false, isDarkMode),
+          stroke: strokeColor,
+          fill: "transparent",
+        });
+
+        context.restore();
+      }
+
       break;
     }
     default: {
