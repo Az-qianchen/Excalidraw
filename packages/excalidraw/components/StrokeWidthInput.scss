@@ -1,0 +1,43 @@
+.excalidraw {
+  .buttonList.stroke-width-list {
+    flex-wrap: nowrap;
+  }
+
+  .buttonList input.stroke-width-input {
+    width: 3rem;
+    height: var(--default-button-size);
+    box-sizing: border-box;
+    border: 0;
+    border-radius: var(--border-radius-lg);
+    background: var(--color-surface-low);
+    color: var(--text-primary-color);
+    font: inherit;
+    font-size: 0.75rem;
+    text-align: center;
+    outline: none;
+    padding: 0;
+    -moz-appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+    }
+
+    &:not(:disabled):not(:read-only) {
+      &:hover {
+        background: var(--color-surface-high);
+      }
+
+      &:active,
+      &:focus {
+        box-shadow: 0 0 0 1px var(--color-brand-active);
+      }
+    }
+
+    &:disabled,
+    &:read-only {
+      background: var(--color-surface-high);
+      color: var(--color-on-surface-variant);
+    }
+  }
+}
