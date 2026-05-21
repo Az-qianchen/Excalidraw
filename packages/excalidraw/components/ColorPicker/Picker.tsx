@@ -204,7 +204,7 @@ export const Picker = React.forwardRef(
             />
           </div>
 
-          /* HSLA 颜色调整滑块：H(色相) / S(饱和度) / L(明度) / A(透明度) */
+          {/* HSLA 颜色调整滑块：H(色相) / S(饱和度) / L(明度) / A(透明度) */}
           <div>
             <PickerHeading>{t("colorPicker.custom")}</PickerHeading>
             <HSLASliders color={color} onChange={onChange} />
