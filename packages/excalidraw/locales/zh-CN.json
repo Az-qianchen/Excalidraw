@@ -576,7 +576,12 @@
     "colors": "颜色",
     "shades": "色调明暗",
     "hexCode": "十六进制值",
-    "noShades": "此颜色没有可用的明暗变化"
+    "noShades": "此颜色没有可用的明暗变化",
+    "custom": "颜色调整",
+    "hue": "色相",
+    "saturation": "饱和度",
+    "lightness": "明度",
+    "alpha": "透明度"
   },
   "overwriteConfirm": {
     "action": {

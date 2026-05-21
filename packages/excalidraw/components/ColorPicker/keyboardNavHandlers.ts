@@ -167,6 +167,7 @@ export const colorPickerKeyNavHandler = ({
       custom: !!customColors.length,
       baseColors: true,
       shades: colorObj?.shade != null,
+      hsla: true, // HSLA 颜色调整滑块
       hex: true,
     };
 

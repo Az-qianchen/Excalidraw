@@ -91,6 +91,7 @@ export type ActiveColorPickerSectionAtomType =
   | "custom"
   | "baseColors"
   | "shades"
+  | "hsla" // HSLA 颜色调整滑块区域
   | "hex"
   | null;
 export const activeColorPickerSectionAtom =

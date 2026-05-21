@@ -353,3 +353,26 @@ export const normalizeInputColor = (color: string): string | null => {
 
   return null;
 };
+
+// -----------------------------------------------------------------------------
+// HSLA 转换工具
+// -----------------------------------------------------------------------------
+
+export type HSLA = { h: number; s: number; l: number; a: number };
+
+/** hex(#RRGGBB) → HSLA，h: 0-360, s/l: 0-100, a: 0-1 */
+export const hexToHSLA = (hex: string): HSLA => {
+  const tc = tinycolor(hex);
+  if (!tc.isValid()) {
+    return { h: 0, s: 0, l: 0, a: 1 };
+  }
+  const { h, s, l } = tc.toHsl();
+  return { h, s: s * 100, l: l * 100, a: tc.getAlpha() };
+};
+
+/** HSLA → hex(#RRGGBB[AA])，s/l: 0-100, a: 0-1 */
+export const hslaToHex = (h: number, s: number, l: number, a: number): string => {
+  const tc = tinycolor({ h, s: s / 100, l: l / 100, a });
+  const { r, g, b } = tc.toRgb();
+  return rgbToHex(r, g, b, a);
+};
