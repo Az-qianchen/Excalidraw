@@ -47,6 +47,7 @@ import {
   isArrowElement,
   isBoundToContainer,
   isElbowArrow,
+  isImageElement,
   isLinearElement,
   isLineElement,
   isTextElement,
@@ -73,9 +74,11 @@ import type {
   ExcalidrawLinearElement,
   ExcalidrawTextElement,
   FontFamilyValues,
+  ImageHSLA,
   TextAlign,
   VerticalAlign,
 } from "@excalidraw/element/types";
+import { DEFAULT_IMAGE_HSLA } from "@excalidraw/element/types";
 
 import type { Scene } from "@excalidraw/element";
 
@@ -88,6 +91,10 @@ import { FontPicker } from "../components/FontPicker/FontPicker";
 import { IconPicker } from "../components/IconPicker";
 import { Range } from "../components/Range";
 import { StrokeWidthInput } from "../components/StrokeWidthInput";
+import {
+  HSLASliderRow,
+  HUE_GRADIENT,
+} from "../components/ColorPicker/HSLASliders";
 import {
   ArrowheadArrowIcon,
   ArrowheadBarIcon,
@@ -759,6 +766,91 @@ export const actionChangeOpacity = register<ExcalidrawElement["opacity"]>({
         step={10}
         testId="opacity"
       />
+    );
+  },
+});
+
+// HSLA 图片颜色调节 (H/S/L/A 四维)
+export const actionChangeImageFilters = register<Partial<ImageHSLA>>({
+  name: "changeImageFilters",
+  label: "labels.imageFilters",
+  trackEvent: false,
+  perform: (elements, appState, value) => {
+    return {
+      elements: changeProperty(
+        elements,
+        appState,
+        (el) => {
+          if (isImageElement(el)) {
+            const current = el.imageHSLA ?? DEFAULT_IMAGE_HSLA;
+            return newElementWith(el, {
+              imageHSLA: { ...current, ...value },
+            });
+          }
+          return el;
+        },
+        true,
+      ),
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    };
+  },
+  PanelComponent: ({ elements, appState, app, updateData }) => {
+    const targetElements = getTargetElements(
+      arrayToMap(getNonDeletedElements(elements)),
+      appState,
+    );
+    const imageElements = targetElements.filter(isImageElement);
+
+    const hslaFields: Array<keyof ImageHSLA> = ["h", "s", "l", "a"];
+    const commonHSLA: Partial<ImageHSLA> = {};
+    for (const field of hslaFields) {
+      const commonVal = reduceToCommonValue(
+        imageElements,
+        (el) => (el.imageHSLA ?? DEFAULT_IMAGE_HSLA)[field],
+      );
+      if (commonVal !== null) {
+        commonHSLA[field] = commonVal;
+      }
+    }
+    const hsla: ImageHSLA = { ...DEFAULT_IMAGE_HSLA, ...commonHSLA };
+
+    const satGradient = `linear-gradient(to right, hsl(${hsla.h}, 0%, 50%), hsl(${hsla.h}, 100%, 50%))`;
+
+    const sliders: Array<{
+      label: string;
+      value: number;
+      min: number;
+      max: number;
+      bg: string;
+      field: keyof ImageHSLA;
+      isAlpha: boolean;
+    }> = [
+      { label: "H", value: hsla.h, min: 0, max: 360, bg: HUE_GRADIENT, field: "h", isAlpha: false },
+      { label: "S", value: hsla.s, min: 0, max: 100, bg: satGradient, field: "s", isAlpha: false },
+      { label: "L", value: hsla.l, min: 0, max: 100, bg: "linear-gradient(to right, #000, #fff)", field: "l", isAlpha: false },
+      { label: "A", value: hsla.a, min: 0, max: 100, bg: "linear-gradient(to right, transparent, #000)", field: "a", isAlpha: true },
+    ];
+
+    return (
+      <>
+        <div className="color-picker__heading" style={{ padding: "0 0.5rem" }}>
+          {t("labels.imageFilters")}
+        </div>
+        <div className="hsla-sliders">
+          {sliders.map(({ label, value, min, max, bg, field, isAlpha }) => (
+            <HSLASliderRow
+              key={field}
+              label={label}
+              value={value}
+              min={min}
+              max={max}
+              bg={bg}
+              isAlpha={isAlpha}
+              onChange={(v) => updateData({ [field]: v })}
+            />
+          ))}
+        </div>
+      </>
     );
   },
 });

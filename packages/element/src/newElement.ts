@@ -49,6 +49,7 @@ import type {
   ExcalidrawElbowArrowElement,
   ExcalidrawLineElement,
 } from "./types";
+import { DEFAULT_IMAGE_HSLA } from "./types";
 
 export type ElementConstructorOpts = MarkOptional<
   Omit<ExcalidrawGenericElement, "id" | "type" | "isDeleted" | "updated">,
@@ -531,6 +532,7 @@ export const newImageElement = (
     fileId?: ExcalidrawImageElement["fileId"];
     scale?: ExcalidrawImageElement["scale"];
     crop?: ExcalidrawImageElement["crop"];
+    imageHSLA?: ExcalidrawImageElement["imageHSLA"];
   } & ElementConstructorOpts,
 ): NonDeleted<ExcalidrawImageElement> => {
   return {
@@ -539,5 +541,6 @@ export const newImageElement = (
     fileId: opts.fileId ?? null,
     scale: opts.scale ?? [1, 1],
     crop: opts.crop ?? null,
+    imageHSLA: opts.imageHSLA ?? DEFAULT_IMAGE_HSLA,
   };
 };

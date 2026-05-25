@@ -13,8 +13,54 @@ interface HSLASlidersProps {
 }
 
 /** 色相滑块的彩虹渐变背景 */
-const HUE_GRADIENT =
+export const HUE_GRADIENT =
   "linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%)";
+
+/** HSLA 单行滑块组件，供颜色选择器和图片滤镜复用 */
+export const HSLASliderRow = ({
+  label,
+  value,
+  min,
+  max,
+  step,
+  bg,
+  isAlpha,
+  disabled,
+  ariaLabel,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  bg: string;
+  isAlpha?: boolean;
+  disabled?: boolean;
+  ariaLabel?: string;
+  onChange: (value: number) => void;
+}) => (
+  <div className="hsla-slider-row">
+    <label className="hsla-slider-label">{label}</label>
+    <div
+      className={clsx("hsla-slider-track", isAlpha && "hsla-slider-track--alpha")}
+    >
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="hsla-slider-input"
+        style={{ background: bg } as React.CSSProperties}
+        disabled={disabled}
+        aria-label={ariaLabel}
+      />
+    </div>
+    <span className="hsla-slider-value">{value}</span>
+  </div>
+);
 
 export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
   /** HSLA 四维本地状态，h: 0-360, s/l/a: 0-100 */
@@ -76,28 +122,21 @@ export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
   return (
     <div className="hsla-sliders">
       {sliders.map(({ label, value, min, max, step, bg, aria, alpha }) => (
-        <div className="hsla-slider-row" key={label}>
-          <label className="hsla-slider-label">{label}</label>
-          <div
-            className={clsx("hsla-slider-track", alpha && "hsla-slider-track--alpha")}
-          >
-            <input
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={value}
-              onChange={(e) =>
-                handleChange({ [label.toLowerCase() as keyof typeof hsla]: Number(e.target.value) } as Partial<typeof hsla>)
-              }
-              className="hsla-slider-input"
-              style={{ background: bg } as React.CSSProperties}
-              disabled={isDisabled}
-              aria-label={aria}
-            />
-          </div>
-          <span className="hsla-slider-value">{value}</span>
-        </div>
+        <HSLASliderRow
+          key={label}
+          label={label}
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          bg={bg}
+          isAlpha={alpha}
+          disabled={isDisabled}
+          ariaLabel={aria}
+          onChange={(v) =>
+            handleChange({ [label.toLowerCase() as keyof typeof hsla]: v } as Partial<typeof hsla>)
+          }
+        />
       ))}
     </div>
   );

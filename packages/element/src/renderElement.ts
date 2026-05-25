@@ -78,7 +78,9 @@ import type {
   ExcalidrawFrameLikeElement,
   NonDeletedSceneElementsMap,
   ElementsMap,
+  ImageHSLA,
 } from "./types";
+import { DEFAULT_IMAGE_HSLA } from "./types";
 
 import type { RoughCanvas } from "roughjs/bin/canvas";
 
@@ -144,6 +146,7 @@ export interface ExcalidrawElementWithCanvas {
   imageCrop: ExcalidrawImageElement["crop"] | null;
   containingFrameOpacity: number;
   boundTextCanvas: HTMLCanvasElement;
+  imageHSLA: ExcalidrawImageElement["imageHSLA"] | null;
 }
 
 const cappedElementCanvasSize = (
@@ -335,6 +338,7 @@ const generateElementCanvas = (
     boundTextCanvas,
     angle: element.angle,
     imageCrop: isImageElement(element) ? element.crop : null,
+    imageHSLA: isImageElement(element) ? (element.imageHSLA ?? null) : null,
   };
 };
 
@@ -508,6 +512,12 @@ const drawElementOnCanvas = (
             }
 
             tempContext.putImageData(imageData, 0, 0);
+            const userFilter = buildImageHSLAFilterString(
+              element.imageHSLA,
+            );
+            if (userFilter) {
+              context.filter = userFilter;
+            }
             context.drawImage(
               tempCanvas,
               0,
@@ -521,8 +531,17 @@ const drawElementOnCanvas = (
             );
           }
         } else {
-          if (shouldInvertImage) {
-            context.filter = DARK_THEME_FILTER;
+          const userFilter = buildImageHSLAFilterString(
+            element.imageHSLA,
+          );
+          const combinedFilter = [
+            shouldInvertImage ? DARK_THEME_FILTER : "",
+            userFilter,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          if (combinedFilter) {
+            context.filter = combinedFilter;
           }
 
           context.drawImage(
@@ -654,6 +673,7 @@ const generateElementWithCanvas = (
   const boundTextElement = getBoundTextElement(element, elementsMap);
   const boundTextElementVersion = boundTextElement?.version || null;
   const imageCrop = isImageElement(element) ? element.crop : null;
+  const imageHSLA = isImageElement(element) ? element.imageHSLA ?? null : null;
 
   const containingFrameOpacity =
     getContainingFrame(element, elementsMap)?.opacity || 100;
@@ -664,6 +684,7 @@ const generateElementWithCanvas = (
     prevElementWithCanvas.theme !== appState.theme ||
     prevElementWithCanvas.boundTextElementVersion !== boundTextElementVersion ||
     prevElementWithCanvas.imageCrop !== imageCrop ||
+    prevElementWithCanvas.imageHSLA !== imageHSLA ||
     prevElementWithCanvas.containingFrameOpacity !== containingFrameOpacity ||
     // since we rotate the canvas when copying from cached canvas, we don't
     // regenerate the cached canvas. But we need to in case of labels which are
@@ -805,6 +826,29 @@ export const renderSelectionElement = (
   context.strokeRect(offset, offset, element.width, element.height);
 
   context.restore();
+};
+
+/** 将 HSLA 参数转换为 CSS filter 字符串 */
+export const buildImageHSLAFilterString = (
+  imageHSLA?: ImageHSLA,
+): string => {
+  if (!imageHSLA) {
+    return "";
+  }
+  const parts: string[] = [];
+  if (imageHSLA.h !== DEFAULT_IMAGE_HSLA.h) {
+    parts.push(`hue-rotate(${imageHSLA.h}deg)`);
+  }
+  if (imageHSLA.s !== DEFAULT_IMAGE_HSLA.s) {
+    parts.push(`saturate(${imageHSLA.s / DEFAULT_IMAGE_HSLA.s})`);
+  }
+  if (imageHSLA.l !== DEFAULT_IMAGE_HSLA.l) {
+    parts.push(`brightness(${imageHSLA.l / DEFAULT_IMAGE_HSLA.l})`);
+  }
+  if (imageHSLA.a !== DEFAULT_IMAGE_HSLA.a) {
+    parts.push(`opacity(${imageHSLA.a / 100})`);
+  }
+  return parts.join(" ");
 };
 
 export const renderElement = (

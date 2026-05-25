@@ -32,6 +32,7 @@
     "strokeStyle_dotted": "点虚线",
     "sloppiness": "线条风格",
     "opacity": "透明度",
+    "imageFilters": "图片调节",
     "textAlign": "文本对齐",
     "edges": "边角",
     "sharp": "尖锐",

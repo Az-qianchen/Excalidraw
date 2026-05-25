@@ -143,6 +143,21 @@ export type ImageCrop = {
   naturalHeight: number;
 };
 
+/** HSLA 图片颜色调节参数 */
+export type ImageHSLA = {
+  h: number; // 0-360
+  s: number; // 0-100
+  l: number; // 0-100
+  a: number; // 0-100
+};
+
+export const DEFAULT_IMAGE_HSLA: ImageHSLA = {
+  h: 0,
+  s: 50,
+  l: 50,
+  a: 100,
+};
+
 export type ExcalidrawImageElement = _ExcalidrawElementBase &
   Readonly<{
     type: "image";
@@ -153,6 +168,8 @@ export type ExcalidrawImageElement = _ExcalidrawElementBase &
     scale: [number, number];
     /** whether an element is cropped */
     crop: ImageCrop | null;
+    /** HSLA 图片颜色调节参数，可选，兼容旧数据 */
+    imageHSLA?: ImageHSLA;
   }>;
 
 export type InitializedExcalidrawImageElement = MarkNonNullable<

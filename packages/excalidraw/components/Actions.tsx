@@ -307,10 +307,58 @@ export const SelectedShapeActions = ({
             {showLinkIcon && renderAction("hyperlink")}
             {showCropEditorAction && renderAction("cropEditor")}
             {showLineEditorAction && renderAction("toggleLinearEditor")}
+            <ImageFiltersButton
+              targetElements={targetElements}
+              renderAction={renderAction}
+            />
           </div>
         </fieldset>
       )}
     </div>
+  );
+};
+
+const ImageFiltersButton = ({
+  targetElements,
+  renderAction,
+}: {
+  targetElements: ExcalidrawElement[];
+  renderAction: ActionManager["renderAction"];
+}) => {
+  const { container } = useExcalidrawContainer();
+  const [showImageFilters, setShowImageFilters] = useState(false);
+
+  if (!targetElements.some(isImageElement)) {
+    return null;
+  }
+
+  return (
+    <Popover.Root
+      open={showImageFilters}
+      onOpenChange={setShowImageFilters}
+    >
+      <Popover.Trigger asChild>
+        <ToolButton
+          type="button"
+          icon={adjustmentsIcon}
+          title={t("labels.imageFilters")}
+          aria-label={t("labels.imageFilters")}
+          onClick={() => setShowImageFilters(!showImageFilters)}
+        />
+      </Popover.Trigger>
+      {showImageFilters && (
+        <PropertiesPopover
+          className={PROPERTIES_CLASSES}
+          container={container}
+          style={{ maxWidth: "14rem" }}
+          onClose={() => setShowImageFilters(false)}
+        >
+          <div className="selected-shape-actions">
+            {renderAction("changeImageFilters")}
+          </div>
+        </PropertiesPopover>
+      )}
+    </Popover.Root>
   );
 };
 
@@ -747,6 +795,10 @@ const CombinedExtraActions = ({
                   {showCropEditorAction && renderAction("cropEditor")}
                   {showDuplicate && renderAction("duplicateSelection")}
                   {showDelete && renderAction("deleteSelectedElements")}
+                  <ImageFiltersButton
+                    targetElements={targetElements}
+                    renderAction={renderAction}
+                  />
                 </div>
               </fieldset>
             </div>

@@ -26,6 +26,7 @@ import {
   isIframeLikeElement,
   isInitializedImageElement,
   isTextElement,
+  buildImageHSLAFilterString,
 } from "@excalidraw/element";
 
 import { getContainingFrame } from "@excalidraw/element";
@@ -522,11 +523,20 @@ const renderElementToSvg = (
 
         const g = svgRoot.ownerDocument.createElementNS(SVG_NS, "g");
 
-        if (
+        const imageG = svgRoot.ownerDocument.createElementNS(SVG_NS, "g");
+
+        // 合成滤镜：dark mode + 用户 HSLA 调节
+        const userFilterStr = buildImageHSLAFilterString(element.imageHSLA);
+        const hasDarkModeFilter =
           renderConfig.theme === THEME.DARK &&
-          fileData.mimeType === MIME_TYPES.svg
-        ) {
-          g.setAttribute("filter", DARK_THEME_FILTER);
+          fileData.mimeType === MIME_TYPES.svg;
+        if (hasDarkModeFilter || userFilterStr) {
+          imageG.setAttribute(
+            "filter",
+            [hasDarkModeFilter ? DARK_THEME_FILTER : "", userFilterStr]
+              .filter(Boolean)
+              .join(" "),
+          );
         }
 
         if (element.crop) {
@@ -545,10 +555,11 @@ const renderElementToSvg = (
 
           mask.appendChild(maskRect);
           root.appendChild(mask);
-          g.setAttribute("mask", `url(#${mask.id})`);
+          imageG.setAttribute("mask", `url(#${mask.id})`);
         }
 
-        g.appendChild(use);
+        imageG.appendChild(use);
+        g.appendChild(imageG);
         g.setAttribute(
           "transform",
           `translate(${offsetX - normalizedCropX} ${
