@@ -756,6 +756,27 @@ export const generateLinearCollisionShape = (
  *
  * @private
  */
+const generateRectanguloidShape = (
+  element: ExcalidrawElement,
+  generator: RoughGenerator,
+  options: Options,
+): Drawable => {
+  if (element.roundness) {
+    const w = element.width;
+    const h = element.height;
+    const r = getCornerRadius(Math.min(w, h), element);
+    return generator.path(
+      `M ${r} 0 L ${w - r} 0 Q ${w} 0, ${w} ${r} L ${w} ${
+        h - r
+      } Q ${w} ${h}, ${w - r} ${h} L ${r} ${h} Q 0 ${h}, 0 ${
+        h - r
+      } L 0 ${r} Q 0 0, ${r} 0`,
+      options,
+    );
+  }
+  return generator.rectangle(0, 0, element.width, element.height, options);
+};
+
 const _generateElementShape = (
   element: Exclude<NonDeletedExcalidrawElement, ExcalidrawSelectionElement>,
   generator: RoughGenerator,
@@ -776,48 +797,19 @@ const _generateElementShape = (
     case "rectangle":
     case "iframe":
     case "embeddable": {
-      let shape: ElementShapes[typeof element.type];
-      // this is for rendering the stroke/bg of the embeddable, especially
-      // when the src url is not set
-
-      if (element.roundness) {
-        const w = element.width;
-        const h = element.height;
-        const r = getCornerRadius(Math.min(w, h), element);
-        shape = generator.path(
-          `M ${r} 0 L ${w - r} 0 Q ${w} 0, ${w} ${r} L ${w} ${
-            h - r
-          } Q ${w} ${h}, ${w - r} ${h} L ${r} ${h} Q 0 ${h}, 0 ${
-            h - r
-          } L 0 ${r} Q 0 0, ${r} 0`,
-          generateRoughOptions(
-            modifyIframeLikeForRoughOptions(
-              element,
-              isExporting,
-              embedsValidationStatus,
-            ),
-            true,
-            isDarkMode,
+      return generateRectanguloidShape(
+        element,
+        generator,
+        generateRoughOptions(
+          modifyIframeLikeForRoughOptions(
+            element,
+            isExporting,
+            embedsValidationStatus,
           ),
-        );
-      } else {
-        shape = generator.rectangle(
-          0,
-          0,
-          element.width,
-          element.height,
-          generateRoughOptions(
-            modifyIframeLikeForRoughOptions(
-              element,
-              isExporting,
-              embedsValidationStatus,
-            ),
-            false,
-            isDarkMode,
-          ),
-        );
-      }
-      return shape;
+          !!element.roundness,
+          isDarkMode,
+        ),
+      );
     }
     case "diamond": {
       let shape: ElementShapes[typeof element.type];
@@ -988,12 +980,21 @@ const _generateElementShape = (
     }
     case "frame":
     case "magicframe":
-    case "text":
-    case "image": {
+    case "text": {
       const shape: ElementShapes[typeof element.type] = null;
       // we return (and cache) `null` to make sure we don't regenerate
       // `element.canvas` on rerenders
       return shape;
+    }
+    case "image": {
+      return generateRectanguloidShape(
+        element,
+        generator,
+        {
+          ...generateRoughOptions(element, !!element.roundness, isDarkMode),
+          fill: "transparent",
+        },
+      );
     }
     default: {
       assertNever(
