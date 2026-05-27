@@ -245,15 +245,14 @@ export const generateRoughOptions = (
     }
     case "line":
     case "freedraw": {
-      if (isPathALoop(element.points)) {
-        options.fillStyle = element.fillStyle;
-        options.fill =
-          element.backgroundColor === "transparent"
-            ? undefined
-            : isDarkMode
-            ? applyDarkModeFilter(element.backgroundColor)
-            : element.backgroundColor;
-      }
+      // 线条和手绘元素即使路径不闭合也可以有背景填充
+      options.fillStyle = element.fillStyle;
+      options.fill =
+        element.backgroundColor === "transparent"
+          ? undefined
+          : isDarkMode
+          ? applyDarkModeFilter(element.backgroundColor)
+          : element.backgroundColor;
       return options;
     }
     case "arrow":
@@ -901,12 +900,31 @@ const _generateElementShape = (
           ];
         }
       } else if (!element.roundness) {
-        // curve is always the first element
-        // this simplifies finding the curve for an element
+        // 曲线始终是第一个元素，这简化了查找元素曲线的过程
         if (options.fill) {
-          shape = [
-            generator.polygon(points as unknown as RoughPoint[], options),
-          ];
+          // 有背景填充的线条元素
+          if (element.type === "line" && !isPathALoop(element.points)) {
+            // 非闭合线条带背景：使用 linearPath 生成描边，单独添加填充形状
+            shape = [
+              generator.linearPath(
+                points as unknown as RoughPoint[],
+                options,
+              ),
+            ];
+            // 使用 curve 生成填充形状（不会自动闭合路径）
+            const fillOptions = {
+              ...options,
+              stroke: "none",
+            };
+            shape.unshift(
+              generator.curve(points as unknown as RoughPoint[], fillOptions),
+            );
+          } else {
+            // 闭合路径或非线条元素：使用 polygon（会自动闭合）
+            shape = [
+              generator.polygon(points as unknown as RoughPoint[], options),
+            ];
+          }
         } else {
           shape = [
             generator.linearPath(points as unknown as RoughPoint[], options),
@@ -955,11 +973,11 @@ const _generateElementShape = (
       return shape;
     }
     case "freedraw": {
-      // oredered in terms of z-index [background, stroke]
+      // 按 z-index 排序：[背景, 描边]
       const shapes: ElementShapes[typeof element.type] = [];
 
-      // (1) background fill (rc shape), optional
-      if (isPathALoop(element.points)) {
+      // (1) 背景填充（可选，无论路径是否闭合）
+      if (element.backgroundColor !== "transparent") {
         // generate rough polygon to fill freedraw shape
         const simplifiedPoints = simplify(
           element.points as Mutable<LocalPoint[]>,
