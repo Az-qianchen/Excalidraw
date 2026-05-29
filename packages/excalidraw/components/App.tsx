@@ -452,7 +452,9 @@ import { isSidebarDockedAtom } from "./Sidebar/Sidebar";
 import { StaticCanvas, InteractiveCanvas } from "./canvases";
 import NewElementCanvas from "./canvases/NewElementCanvas";
 import { isPointHittingLink } from "./hyperlink/helpers";
-import { MagicIcon, copyIcon, fullscreenIcon } from "./icons";
+import { MaskEditor } from "../mask-editor";
+import { ToolButton } from "./ToolButton";
+import { MagicIcon, copyIcon, fullscreenIcon, maskToggleIcon } from "./icons";
 import { AppStateObserver, type OnStateChange } from "./AppStateObserver";
 
 import { findShapeByKey } from "./shapes";
@@ -662,6 +664,8 @@ class App extends React.Component<AppProps, AppState> {
   private initializedEmbeds = new Set<ExcalidrawIframeLikeElement["id"]>();
 
   private elementsPendingErasure: ElementsPendingErasure = new Set();
+
+  private maskPointHistory: GlobalPoint[][] = [];
 
   private _initialized = false;
 
@@ -2315,6 +2319,115 @@ class App extends React.Component<AppProps, AppState> {
                               </ElementCanvasButtons>
                             )}
 
+                          {this.state.maskingElementId &&
+                            (() => {
+                              const maskingElement = this.scene.getElement(
+                                this.state.maskingElementId,
+                              );
+                              if (!maskingElement) {
+                                return null;
+                              }
+                              const [x1, y1] = getElementAbsoluteCoords(
+                                maskingElement,
+                                elementsMap,
+                              );
+                              const { x: viewportX, y: viewportY } =
+                                sceneCoordsToViewportCoords(
+                                  {
+                                    sceneX: x1 + maskingElement.width,
+                                    sceneY: y1,
+                                  },
+                                  this.state,
+                                );
+                              const btnX =
+                                viewportX - this.state.offsetLeft + 10;
+                              const btnY = viewportY - this.state.offsetTop;
+                              return (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: `${btnY}px`,
+                                    left: `${btnX}px`,
+                                    zIndex: "var(--zIndex-canvasButtons)",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.25rem",
+                                    background: "var(--island-bg-color)",
+                                    borderRadius: "var(--border-radius-lg)",
+                                    boxShadow:
+                                      "0px 2px 4px 0 rgb(0 0 0 / 30%)",
+                                    padding: "4px",
+                                  }}
+                                >
+                                  <ToolButton
+                                    type="button"
+                                    title={
+                                      this.state.maskingMode === "keepInside"
+                                        ? t("helpDialog.maskKeepInside")
+                                        : t("helpDialog.maskKeepOutside")
+                                    }
+                                    aria-label={
+                                      this.state.maskingMode === "keepInside"
+                                        ? t("helpDialog.maskKeepInside")
+                                        : t("helpDialog.maskKeepOutside")
+                                    }
+                                    icon={maskToggleIcon}
+                                    selected={
+                                      this.state.maskingMode === "keepOutside"
+                                    }
+                                    onClick={() => {
+                                      this.setState({
+                                        maskingMode:
+                                          this.state.maskingMode ===
+                                          "keepInside"
+                                            ? "keepOutside"
+                                            : "keepInside",
+                                      });
+                                    }}
+                                  />
+                                  <ToolButton
+                                    type="button"
+                                    title={t("helpDialog.maskFinish")}
+                                    aria-label={t("helpDialog.maskFinish")}
+                                    icon={
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <path d="M20 6 9 17l-5-5" />
+                                      </svg>
+                                    }
+                                    onClick={this.applyMask}
+                                  />
+                                  <ToolButton
+                                    type="button"
+                                    title={t("helpDialog.maskCancel")}
+                                    aria-label={t("helpDialog.maskCancel")}
+                                    icon={
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <path d="M18 6 6 18" />
+                                        <path d="m6 6 12 12" />
+                                      </svg>
+                                    }
+                                    onClick={this.finishMasking}
+                                  />
+                                </div>
+                              );
+                            })()}
+
                           {this.state.contextMenu && (
                             <ContextMenu
                               items={this.state.contextMenu.items}
@@ -3396,6 +3509,13 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   componentDidUpdate(prevProps: AppProps, prevState: AppState) {
+    if (
+      !prevState.maskingElementId &&
+      this.state.maskingElementId
+    ) {
+      this.maskPointHistory = [];
+    }
+
     // must be updated *before* state change listeners are triggered below
     if (!this._initialized && !this.state.isLoading) {
       this._initialized = true;
@@ -4782,6 +4902,47 @@ class App extends React.Component<AppProps, AppState> {
           return;
         }
 
+        if (this.state.maskingElementId) {
+          if (event.key === KEYS.ESCAPE) {
+            this.finishMasking();
+            return;
+          }
+          if (event.key === KEYS.ENTER) {
+            this.applyMask();
+            return;
+          }
+          if (
+            event.key === KEYS.BACKSPACE ||
+            event.key === KEYS.DELETE
+          ) {
+            event.preventDefault();
+            this.maskPointHistory.push([...this.state.maskingPoints]);
+            const newPoints =
+              this.state.selectedMaskPointIndex !== null
+                ? MaskEditor.removePoint(
+                    this.state.maskingPoints,
+                    this.state.selectedMaskPointIndex,
+                  )
+                : MaskEditor.removeLastPoint(this.state.maskingPoints);
+            this.setState({
+              maskingPoints: newPoints,
+              selectedMaskPointIndex: null,
+            });
+            return;
+          }
+          if (event.key === KEYS.Z && event.ctrlKey && !event.shiftKey) {
+            event.preventDefault();
+            const prevPoints = this.maskPointHistory.pop();
+            if (prevPoints) {
+              this.setState({
+                maskingPoints: prevPoints,
+                selectedMaskPointIndex: null,
+              });
+            }
+            return;
+          }
+        }
+
         const selectedElements = getSelectedElements(
           this.scene.getNonDeletedElementsMap(),
           this.state,
@@ -5540,6 +5701,11 @@ class App extends React.Component<AppProps, AppState> {
         `"${tool.type}" tool is disabled via "UIOptions.canvasActions.tools.${tool.type}"`,
       );
       return;
+    }
+
+    // 切换工具时退出遮罩编辑模式
+    if (this.state.maskingElementId) {
+      this.finishMasking();
     }
 
     const nextActiveTool = updateActiveTool(this.state, tool);
@@ -6380,6 +6546,77 @@ class App extends React.Component<AppProps, AppState> {
         croppingElementId: null,
       });
     }
+  };
+
+  private finishMasking = () => {
+    if (this.state.maskingElementId) {
+      this.store.scheduleCapture();
+      this.setState({
+        maskingElementId: null,
+        maskingPoints: [],
+        maskingMode: "keepInside",
+        selectedMaskPointIndex: null,
+        isMasking: false,
+      });
+    }
+  };
+
+  private isApplyingMask = false;
+
+  private applyMask = async () => {
+    if (this.isApplyingMask) return;
+    this.isApplyingMask = true;
+
+    const { maskingElementId, maskingPoints, maskingMode } = this.state;
+    if (!maskingElementId || maskingPoints.length < 3) {
+      this.isApplyingMask = false;
+      this.finishMasking();
+      return;
+    }
+
+    const element = this.scene.getElement(maskingElementId);
+    if (!element || !isImageElement(element)) {
+      this.isApplyingMask = false;
+      this.finishMasking();
+      return;
+    }
+
+    try {
+      const result = await MaskEditor.applyMask(
+        element,
+        maskingPoints,
+        maskingMode,
+        this.files,
+      );
+
+      if (result) {
+        const newFileId =
+          nanoid() as import("@excalidraw/element/types").FileId;
+
+        const newFileData: BinaryFileData = {
+          id: newFileId,
+          dataURL: result.dataURL as unknown as import("../types").DataURL,
+          mimeType: "image/png" as const,
+          created: Date.now(),
+        };
+
+        this.addMissingFiles([newFileData]);
+
+        this.scene.mutateElement(element, {
+          fileId: newFileId,
+          crop: null,
+        });
+
+        this.clearImageShapeCache({ [newFileId]: newFileData } as BinaryFiles);
+        this.scene.triggerUpdate();
+        this.addNewImagesToImageCache();
+      }
+    } catch (err) {
+      console.error("Failed to apply mask:", err);
+    }
+
+    this.isApplyingMask = false;
+    this.finishMasking();
   };
 
   private shouldHandleBrowserCanvasDoubleClick = (type: string) => {
@@ -7434,6 +7671,10 @@ class App extends React.Component<AppProps, AppState> {
       );
     } else {
       hideHyperlinkToolip();
+      if (this.state.maskingElementId) {
+        setCursor(this.interactiveCanvas, CURSOR_TYPE.CROSSHAIR);
+        return;
+      }
       if (isLaserTool) {
         return;
       }
@@ -7745,6 +7986,26 @@ class App extends React.Component<AppProps, AppState> {
 
     if (this.state.snapLines) {
       this.setAppState({ snapLines: [] });
+    }
+
+    // 遮罩编辑模式下，只允许在遮罩元素上操作，但允许拖拽画布
+    if (this.state.maskingElementId) {
+      if (
+        event.button === POINTER_BUTTON.WHEEL ||
+        isHoldingSpace ||
+        isHandToolActive(this.state)
+      ) {
+        // 允许通过，不做拦截
+      } else {
+        const scenePointer2 = viewportCoordsToSceneCoords(event, this.state);
+        const hitForMask = this.getElementAtPosition(
+          scenePointer2.x,
+          scenePointer2.y,
+        );
+        if (hitForMask?.id !== this.state.maskingElementId) {
+          return;
+        }
+      }
     }
 
     if (this.state.openPopup) {
@@ -8159,6 +8420,12 @@ class App extends React.Component<AppProps, AppState> {
       event,
     );
     this.lastPointerUpEvent = event;
+
+    // 遮罩编辑模式下，只处理遮罩相关逻辑
+    if (this.state.maskingElementId) {
+      this.setState({ isMasking: false });
+      return;
+    }
 
     if (!event.ctrlKey) {
       const preferenceEnabled = this.state.bindingPreference === "enabled";
@@ -8705,6 +8972,61 @@ class App extends React.Component<AppProps, AppState> {
           pointerDownState.hit.element?.id !== this.state.croppingElementId
         ) {
           this.finishImageCropping();
+        }
+
+        if (this.state.maskingElementId) {
+          const x = pointerDownState.origin.x;
+          const y = pointerDownState.origin.y;
+          const zoom = this.state.zoom.value;
+
+          // 检查是否点击了现有顶点
+          const pointIndex = MaskEditor.getPointUnderCursor(
+            this.state.maskingPoints,
+            x,
+            y,
+            zoom,
+          );
+
+          if (pointIndex >= 0) {
+            this.maskPointHistory.push([...this.state.maskingPoints]);
+            this.setState({
+              selectedMaskPointIndex: pointIndex,
+              isMasking: true,
+            });
+          } else {
+            // 检查是否点击了中点
+            const midpointIndex = MaskEditor.getMidpointUnderCursor(
+              this.state.maskingPoints,
+              x,
+              y,
+              zoom,
+            );
+
+            if (midpointIndex >= 0) {
+              const newPoint = pointFrom<GlobalPoint>(x, y);
+              this.maskPointHistory.push([...this.state.maskingPoints]);
+              this.setState({
+                maskingPoints: MaskEditor.insertPoint(
+                  this.state.maskingPoints,
+                  midpointIndex,
+                  newPoint,
+                ),
+                selectedMaskPointIndex: midpointIndex,
+                isMasking: true,
+              });
+            } else {
+              const newPoint = pointFrom<GlobalPoint>(x, y);
+              this.maskPointHistory.push([...this.state.maskingPoints]);
+              this.setState({
+                maskingPoints: MaskEditor.addPoint(
+                  this.state.maskingPoints,
+                  newPoint,
+                ),
+                selectedMaskPointIndex: null,
+              });
+            }
+          }
+          return false;
         }
 
         if (pointerDownState.hit.element) {
@@ -9791,6 +10113,22 @@ class App extends React.Component<AppProps, AppState> {
           return true;
         }
       }
+
+      if (this.state.isMasking && this.state.selectedMaskPointIndex !== null) {
+        const newPoint = pointFrom<GlobalPoint>(
+          pointerCoords.x,
+          pointerCoords.y,
+        );
+        this.setState({
+          maskingPoints: MaskEditor.movePoint(
+            this.state.maskingPoints,
+            this.state.selectedMaskPointIndex,
+            newPoint,
+          ),
+        });
+        return false;
+      }
+
       const elementsMap = this.scene.getNonDeletedElementsMap();
 
       if (this.state.selectedLinearElement) {
@@ -10622,6 +10960,7 @@ class App extends React.Component<AppProps, AppState> {
         isResizing: false,
         isRotating: false,
         isCropping: false,
+        isMasking: false,
         resizingElement: null,
         selectionElement: null,
         frameToHighlight: null,

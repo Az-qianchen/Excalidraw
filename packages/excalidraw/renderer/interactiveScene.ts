@@ -93,6 +93,7 @@ import {
   getTextAutoResizeHandle,
   getTextBoxPadding,
 } from "../textAutoResizeHandle";
+import { MaskEditor, MASK_MIDPOINT_HANDLE_SIZE } from "../mask-editor";
 
 import {
   bootstrapCanvas,
@@ -1490,6 +1491,114 @@ const renderCropHandles = (
   context.restore();
 };
 
+const renderMaskEditor = (
+  context: CanvasRenderingContext2D,
+  renderConfig: InteractiveCanvasRenderConfig,
+  appState: InteractiveCanvasAppState,
+  maskingElement: ExcalidrawImageElement,
+  elementsMap: ElementsMap,
+): void => {
+  const { maskingPoints, maskingMode, selectedMaskPointIndex, zoom } = appState;
+  if (!maskingPoints || maskingPoints.length === 0) {
+    return;
+  }
+
+  try {
+    context.save();
+
+    const [x1, y1, x2, y2] = getElementAbsoluteCoords(
+      maskingElement,
+      elementsMap,
+    );
+    const cx = (x1 + x2) / 2;
+    const cy = (y1 + y2) / 2;
+    const width = x2 - x1;
+    const height = y2 - y1;
+
+    const toLocalCoords = (p: readonly [number, number]) => {
+      return { x: p[0] - cx, y: p[1] - cy };
+    };
+
+    const savedLocalPoints = maskingPoints.map(toLocalCoords);
+
+    // 绘制遮罩叠加层，用 clip 限制 destination-out 的范围
+    context.save();
+    context.translate(cx, cy);
+    context.rotate(maskingElement.angle);
+    context.scale(
+      maskingElement.scale[0] < 0 ? -1 : 1,
+      maskingElement.scale[1] < 0 ? -1 : 1,
+    );
+
+    // 创建裁剪区域，限制在图片范围内
+    context.beginPath();
+    context.rect(-width / 2, -height / 2, width, height);
+    context.clip();
+
+    if (maskingMode === "keepOutside") {
+      context.fillStyle = "rgba(255, 0, 0, 0.15)";
+      context.fillRect(-width / 2, -height / 2, width, height);
+      context.globalCompositeOperation = "destination-out";
+      MaskEditor.tracePolygonPath(context, savedLocalPoints);
+      context.fillStyle = "black";
+      context.fill();
+      context.globalCompositeOperation = "source-over";
+    } else {
+      MaskEditor.tracePolygonPath(context, savedLocalPoints);
+      context.fillStyle = "rgba(255, 0, 0, 0.15)";
+      context.fill();
+    }
+
+    context.restore();
+
+    // 绘制多边形轮廓
+    context.strokeStyle = renderConfig.selectionColor;
+    context.lineWidth = 2 / zoom.value;
+    context.setLineDash([4 / zoom.value, 4 / zoom.value]);
+
+    MaskEditor.tracePolygonPath(context, maskingPoints);
+    context.stroke();
+    context.setLineDash([]);
+
+    // 绘制顶点手柄
+    const handleSize = 10 / zoom.value;
+    for (let i = 0; i < maskingPoints.length; i++) {
+      const p = maskingPoints[i];
+      const isSelected = i === selectedMaskPointIndex;
+
+      context.beginPath();
+      context.arc(p[0], p[1], handleSize / 2, 0, Math.PI * 2);
+      context.fillStyle = isSelected ? renderConfig.selectionColor : "#fff";
+      context.fill();
+      context.strokeStyle = renderConfig.selectionColor;
+      context.lineWidth = 2 / zoom.value;
+      context.stroke();
+    }
+
+    // 绘制中点手柄（两个顶点之间的虚拟点）
+    if (maskingPoints.length >= 2) {
+      const midpointSize = MASK_MIDPOINT_HANDLE_SIZE / zoom.value;
+      for (let i = 0; i < maskingPoints.length; i++) {
+        const next = (i + 1) % maskingPoints.length;
+        const midX = (maskingPoints[i][0] + maskingPoints[next][0]) / 2;
+        const midY = (maskingPoints[i][1] + maskingPoints[next][1]) / 2;
+
+        context.beginPath();
+        context.arc(midX, midY, midpointSize / 2, 0, Math.PI * 2);
+        context.fillStyle = "rgba(255, 255, 255, 0.8)";
+        context.fill();
+        context.strokeStyle = renderConfig.selectionColor;
+        context.lineWidth = 1.5 / zoom.value;
+        context.stroke();
+      }
+    }
+
+    context.restore();
+  } catch (err) {
+    console.warn("Mask editor render error:", err);
+  }
+};
+
 const renderTextBox = (
   text: NonDeleted<ExcalidrawTextElement>,
   context: CanvasRenderingContext2D,
@@ -1929,6 +2038,20 @@ const _renderInteractiveScene = ({
             renderConfig,
             appState,
             croppingElement,
+            elementsMap,
+          );
+        }
+      }
+
+      if (appState.maskingElementId) {
+        const maskingElement = elementsMap.get(appState.maskingElementId);
+
+        if (maskingElement && isImageElement(maskingElement)) {
+          renderMaskEditor(
+            context,
+            renderConfig,
+            appState,
+            maskingElement,
             elementsMap,
           );
         }

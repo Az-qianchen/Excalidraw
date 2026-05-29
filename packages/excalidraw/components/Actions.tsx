@@ -182,6 +182,12 @@ export const SelectedShapeActions = ({
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
 
+  const showMaskEditorAction =
+    !appState.maskingElementId &&
+    !appState.croppingElementId &&
+    targetElements.length === 1 &&
+    isImageElement(targetElements[0]);
+
   const showAlignActions =
     !isSingleElementBoundContainer && alignActionsPredicate(appState, app);
 
@@ -306,6 +312,7 @@ export const SelectedShapeActions = ({
             {renderAction("ungroup")}
             {showLinkIcon && renderAction("hyperlink")}
             {showCropEditorAction && renderAction("cropEditor")}
+            {showMaskEditorAction && renderAction("maskEditor")}
             {showLineEditorAction && renderAction("toggleLinearEditor")}
             <ImageFiltersButton
               targetElements={targetElements}
@@ -678,6 +685,11 @@ const CombinedExtraActions = ({
     !appState.croppingElementId &&
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
+  const showMaskEditorAction =
+    !appState.maskingElementId &&
+    !appState.croppingElementId &&
+    targetElements.length === 1 &&
+    isImageElement(targetElements[0]);
   const showLinkIcon = targetElements.length === 1;
   const showAlignActions = alignActionsPredicate(appState, app);
   let isSingleElementBoundContainer = false;
@@ -793,6 +805,7 @@ const CombinedExtraActions = ({
                   {renderAction("ungroup")}
                   {showLinkIcon && renderAction("hyperlink")}
                   {showCropEditorAction && renderAction("cropEditor")}
+                  {showMaskEditorAction && renderAction("maskEditor")}
                   {showDuplicate && renderAction("duplicateSelection")}
                   {showDelete && renderAction("deleteSelectedElements")}
                   <ImageFiltersButton

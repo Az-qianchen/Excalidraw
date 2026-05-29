@@ -460,7 +460,13 @@
     "movePageUpDown": "Move page up/down",
     "movePageLeftRight": "Move page left/right",
     "cropStart": "Crop image",
-    "cropFinish": "Finish image cropping"
+    "cropFinish": "Finish image cropping",
+    "maskStart": "Remove background",
+    "maskFinish": "Apply mask",
+    "maskCancel": "Cancel masking",
+    "maskKeepInside": "Keep inside",
+    "maskKeepOutside": "Keep outside",
+    "maskHint": "Click to add points. Press Enter to apply, Esc to cancel."
   },
   "clearCanvasDialog": {
     "title": "Clear canvas"

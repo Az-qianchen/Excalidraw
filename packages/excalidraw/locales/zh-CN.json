@@ -438,7 +438,13 @@
     "movePageUpDown": "上下移动页面",
     "movePageLeftRight": "左右移动页面",
     "cropStart": "裁剪图片",
-    "cropFinish": "完成图片裁剪"
+    "cropFinish": "完成图片裁剪",
+    "maskStart": "抠图",
+    "maskFinish": "应用遮罩",
+    "maskCancel": "取消抠图",
+    "maskKeepInside": "保留内部",
+    "maskKeepOutside": "保留外部",
+    "maskHint": "点击添加顶点，Enter 应用，Esc 取消。"
   },
   "clearCanvasDialog": {
     "title": "清除画布"

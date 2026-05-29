@@ -801,6 +801,23 @@ export class AppStateDelta implements DeltaContainer<AppState> {
 
             break;
           }
+          case "maskingElementId": {
+            const maskingElementId = nextAppState[key];
+
+            if (!maskingElementId) {
+              visibleDifferenceFlag.value = true;
+            } else {
+              const element = nextElements.get(maskingElementId);
+
+              if (element && !element.isDeleted) {
+                visibleDifferenceFlag.value = true;
+              } else {
+                nextAppState[key] = null;
+              }
+            }
+
+            break;
+          }
           case "editingGroupId":
             const editingGroupId = nextAppState[key];
 
@@ -936,6 +953,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
       selectedElementIds,
       selectedLinearElement,
       croppingElementId,
+      maskingElementId,
       lockedMultiSelections,
       activeLockedId,
       ...standaloneProps

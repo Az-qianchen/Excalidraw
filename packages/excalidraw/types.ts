@@ -236,6 +236,12 @@ export type InteractiveCanvasAppState = Readonly<
     // Cropping
     isCropping: AppState["isCropping"];
     croppingElementId: AppState["croppingElementId"];
+    // Masking
+    isMasking: AppState["isMasking"];
+    maskingElementId: AppState["maskingElementId"];
+    maskingPoints: AppState["maskingPoints"];
+    maskingMode: AppState["maskingMode"];
+    selectedMaskPointIndex: AppState["selectedMaskPointIndex"];
     // Search matches
     searchMatches: AppState["searchMatches"];
     activeLockedId: AppState["activeLockedId"];
@@ -265,6 +271,7 @@ export type ObservedElementsAppState = {
     isEditing: boolean;
   } | null;
   croppingElementId: AppState["croppingElementId"];
+  maskingElementId: AppState["maskingElementId"];
   lockedMultiSelections: AppState["lockedMultiSelections"];
   activeLockedId: AppState["activeLockedId"];
 };
@@ -464,6 +471,13 @@ export interface AppState {
   /** image cropping */
   isCropping: boolean;
   croppingElementId: ExcalidrawElement["id"] | null;
+
+  /** 遮罩编辑 */
+  isMasking: boolean;
+  maskingElementId: ExcalidrawElement["id"] | null;
+  maskingPoints: GlobalPoint[];
+  maskingMode: "keepInside" | "keepOutside";
+  selectedMaskPointIndex: number | null;
 
   /** null if no search matches found / search closed */
   searchMatches: Readonly<{

@@ -144,6 +144,10 @@ const getHints = ({
     });
   }
 
+  if (appState.maskingElementId) {
+    return t("helpDialog.maskHint");
+  }
+
   if (appState.croppingElementId) {
     return t("hints.leaveCropEditor", {
       shortcut_1: getTaggedShortcutKey("Enter"),
