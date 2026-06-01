@@ -143,6 +143,7 @@ export type ActionName =
   | "copyElementLink"
   | "linkToElement"
   | "cropEditor"
+  | "autoCrop"
   | "maskEditor"
   | "wrapSelectionInFrame"
   | "toggleLassoTool"

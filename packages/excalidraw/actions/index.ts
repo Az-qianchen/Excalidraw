@@ -93,3 +93,4 @@ export { actionToggleSearchMenu } from "./actionToggleSearchMenu";
 
 export { actionToggleCropEditor } from "./actionCropEditor";
 export { actionToggleMaskEditor } from "./actionMaskEditor";
+export { actionAutoCrop } from "./actionAutoCrop";

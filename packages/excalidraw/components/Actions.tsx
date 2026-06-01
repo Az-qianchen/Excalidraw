@@ -182,6 +182,8 @@ export const SelectedShapeActions = ({
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
 
+  const showAutoCropAction = showCropEditorAction;
+
   const showMaskEditorAction =
     !appState.maskingElementId &&
     !appState.croppingElementId &&
@@ -311,6 +313,7 @@ export const SelectedShapeActions = ({
             {renderAction("group")}
             {renderAction("ungroup")}
             {showLinkIcon && renderAction("hyperlink")}
+            {showAutoCropAction && renderAction("autoCrop")}
             {showCropEditorAction && renderAction("cropEditor")}
             {showMaskEditorAction && renderAction("maskEditor")}
             {showLineEditorAction && renderAction("toggleLinearEditor")}

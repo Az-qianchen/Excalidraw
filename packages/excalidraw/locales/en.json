@@ -461,6 +461,7 @@
     "movePageLeftRight": "Move page left/right",
     "cropStart": "Crop image",
     "cropFinish": "Finish image cropping",
+    "autoCrop": "Auto-crop whitespace",
     "maskStart": "Remove background",
     "maskFinish": "Apply mask",
     "maskCancel": "Cancel masking",

@@ -590,6 +590,93 @@ const adjustCropPosition = (
   };
 };
 
+export const detectContentBounds = (
+  img: HTMLImageElement,
+  crop: ImageCrop | null,
+): ImageCrop | null => {
+  const w = crop?.width ?? img.naturalWidth;
+  const h = crop?.height ?? img.naturalHeight;
+  const sx = crop?.x ?? 0;
+  const sy = crop?.y ?? 0;
+
+  const MAX = 1024;
+  const scale = Math.min(1, MAX / Math.max(w, h));
+  const cw = Math.max(1, Math.round(w * scale));
+  const ch = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    return null;
+  }
+  ctx.drawImage(img, sx, sy, w, h, 0, 0, cw, ch);
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, cw, ch).data;
+  } catch {
+    return null;
+  }
+
+  let minX = 0;
+  let minY = 0;
+  let maxX = 0;
+  let maxY = 0;
+  let found = false;
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      if (data[(y * cw + x) * 4 + 3] === 0) {
+        continue;
+      }
+      if (!found) {
+        minX = x;
+        minY = y;
+        maxX = x;
+        maxY = y;
+        found = true;
+      } else {
+        if (x > maxX) {
+          maxX = x;
+        }
+        if (y > maxY) {
+          maxY = y;
+        }
+      }
+    }
+  }
+  if (!found) {
+    return null;
+  }
+
+  const inv = 1 / scale;
+  return {
+    x: sx + minX * inv,
+    y: sy + minY * inv,
+    width: (maxX - minX + 1) * inv,
+    height: (maxY - minY + 1) * inv,
+    naturalWidth: img.naturalWidth,
+    naturalHeight: img.naturalHeight,
+  };
+};
+
+export const autoCropImageElement = (
+  element: ExcalidrawImageElement,
+  bounds: ImageCrop,
+) => {
+  const refW = element.crop?.width ?? bounds.naturalWidth;
+  const refH = element.crop?.height ?? bounds.naturalHeight;
+  const newW = bounds.width * (element.width / refW);
+  const newH = bounds.height * (element.height / refH);
+  return {
+    x: element.x + (element.width - newW) / 2,
+    y: element.y + (element.height - newH) / 2,
+    width: newW,
+    height: newH,
+    crop: bounds,
+  };
+};
+
 export const getFlipAdjustedCropPosition = (
   element: ExcalidrawImageElement,
   natural = false,

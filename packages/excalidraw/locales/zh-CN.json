@@ -439,6 +439,7 @@
     "movePageLeftRight": "左右移动页面",
     "cropStart": "裁剪图片",
     "cropFinish": "完成图片裁剪",
+    "autoCrop": "自动裁剪空白",
     "maskStart": "抠图",
     "maskFinish": "应用遮罩",
     "maskCancel": "取消抠图",

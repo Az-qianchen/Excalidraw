@@ -2369,6 +2369,17 @@ export const cropIcon = createIcon(
   tablerIconProps,
 );
 
+export const cropAutoIcon = createIcon(
+  <g strokeWidth="1.25">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M14 10l7 -7" />
+    <path d="M20 10h-6V4" />
+    <path d="M3 21l7 -7" />
+    <path d="M4 14h6v6" />
+  </g>,
+  tablerIconProps,
+);
+
 export const maskIcon = createIcon(
   <g strokeWidth="2" fill="none" strokeLinecap="round">
     <path d="M10 2h4" />
