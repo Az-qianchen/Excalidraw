@@ -32,7 +32,7 @@ export const actionToggleMaskEditor = register({
         selectedMaskPointIndex: null,
         isMasking: false,
       },
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      captureUpdate: CaptureUpdateAction.NEVER,
     };
   },
   predicate: (elements, appState, _, app) => {
