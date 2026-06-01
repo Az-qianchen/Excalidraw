@@ -664,6 +664,10 @@ class App extends React.Component<AppProps, AppState> {
 
   private elementsPendingErasure: ElementsPendingErasure = new Set();
 
+  /**
+   * 遮罩多边形编辑的本地撤销栈。遮罩编辑器打开时，Ctrl/Cmd+Z
+   * 只从这里恢复遮罩点，避免尚未应用的临时点位进入全局历史记录。
+   */
   private maskPointHistory: GlobalPoint[][] = [];
 
   private _initialized = false;
@@ -4914,7 +4918,6 @@ class App extends React.Component<AppProps, AppState> {
             event.key === KEYS.DELETE
           ) {
             event.preventDefault();
-            this.maskPointHistory.push([...this.state.maskingPoints]);
             const newPoints =
               this.state.selectedMaskPointIndex !== null
                 ? MaskEditor.removePoint(
@@ -4922,19 +4925,28 @@ class App extends React.Component<AppProps, AppState> {
                     this.state.selectedMaskPointIndex,
                   )
                 : MaskEditor.removeLastPoint(this.state.maskingPoints);
-            this.setState({
-              maskingPoints: newPoints,
-              selectedMaskPointIndex: null,
-            });
+            if (newPoints.length !== this.state.maskingPoints.length) {
+              this.maskPointHistory.push([...this.state.maskingPoints]);
+              this.setState({
+                maskingPoints: newPoints,
+                selectedMaskPointIndex: null,
+                isMasking: false,
+              });
+            }
             return;
           }
-          if (event.key === KEYS.Z && event.ctrlKey && !event.shiftKey) {
+          if (
+            event.key === KEYS.Z &&
+            event[KEYS.CTRL_OR_CMD] &&
+            !event.shiftKey
+          ) {
             event.preventDefault();
             const prevPoints = this.maskPointHistory.pop();
             if (prevPoints) {
               this.setState({
                 maskingPoints: prevPoints,
                 selectedMaskPointIndex: null,
+                isMasking: false,
               });
             }
             return;
@@ -6548,7 +6560,8 @@ class App extends React.Component<AppProps, AppState> {
 
   private finishMasking = () => {
     if (this.state.maskingElementId) {
-      this.store.scheduleCapture();
+      this.maskPointHistory = [];
+      this.store.scheduleAction(CaptureUpdateAction.NEVER);
       this.setState({
         maskingElementId: null,
         maskingPoints: [],
@@ -6588,6 +6601,10 @@ class App extends React.Component<AppProps, AppState> {
       );
 
       if (result) {
+        flushSync(() => {
+          this.finishMasking();
+        });
+
         const newFileId =
           nanoid() as import("@excalidraw/element/types").FileId;
 
@@ -6604,6 +6621,7 @@ class App extends React.Component<AppProps, AppState> {
           fileId: newFileId,
           crop: null,
         });
+        this.store.scheduleCapture();
 
         this.clearImageShapeCache({ [newFileId]: newFileData } as BinaryFiles);
         this.scene.triggerUpdate();
