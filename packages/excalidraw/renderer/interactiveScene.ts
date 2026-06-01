@@ -1496,7 +1496,6 @@ const renderMaskEditor = (
   renderConfig: InteractiveCanvasRenderConfig,
   appState: InteractiveCanvasAppState,
   maskingElement: ExcalidrawImageElement,
-  elementsMap: ElementsMap,
 ): void => {
   const { maskingPoints, maskingMode, selectedMaskPointIndex, zoom } = appState;
   if (!maskingPoints || maskingPoints.length === 0) {
@@ -1506,20 +1505,22 @@ const renderMaskEditor = (
   try {
     context.save();
 
-    const [x1, y1, x2, y2] = getElementAbsoluteCoords(
-      maskingElement,
-      elementsMap,
-    );
-    const cx = (x1 + x2) / 2;
-    const cy = (y1 + y2) / 2;
-    const width = x2 - x1;
-    const height = y2 - y1;
+    const cx = maskingElement.x + maskingElement.width / 2;
+    const cy = maskingElement.y + maskingElement.height / 2;
+    const width = maskingElement.width;
+    const height = maskingElement.height;
 
-    const toLocalCoords = (p: readonly [number, number]) => {
-      return { x: p[0] - cx, y: p[1] - cy };
-    };
+    const savedLocalPoints = maskingPoints.map((point) => {
+      const localPoint = MaskEditor.globalToElementLocalDisplay(
+        point,
+        maskingElement,
+      );
 
-    const savedLocalPoints = maskingPoints.map(toLocalCoords);
+      return {
+        x: localPoint.x - width / 2,
+        y: localPoint.y - height / 2,
+      };
+    });
 
     // 绘制遮罩叠加层，用 clip 限制 destination-out 的范围
     context.save();
@@ -2047,13 +2048,7 @@ const _renderInteractiveScene = ({
         const maskingElement = elementsMap.get(appState.maskingElementId);
 
         if (maskingElement && isImageElement(maskingElement)) {
-          renderMaskEditor(
-            context,
-            renderConfig,
-            appState,
-            maskingElement,
-            elementsMap,
-          );
+          renderMaskEditor(context, renderConfig, appState, maskingElement);
         }
       }
     } else if (

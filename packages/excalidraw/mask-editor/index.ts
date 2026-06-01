@@ -137,11 +137,9 @@ export class MaskEditor {
     return -1;
   }
 
-  static globalToImageLocal(
+  static globalToElementLocalDisplay(
     globalPoint: GlobalPoint,
     element: ExcalidrawImageElement,
-    naturalWidth: number,
-    naturalHeight: number,
   ): { x: number; y: number } {
     const cx = element.x + element.width / 2;
     const cy = element.y + element.height / 2;
@@ -161,6 +159,20 @@ export class MaskEditor {
     if (element.scale[1] < 0) {
       localY = element.height - localY;
     }
+
+    return { x: localX, y: localY };
+  }
+
+  static globalToImageLocal(
+    globalPoint: GlobalPoint,
+    element: ExcalidrawImageElement,
+    naturalWidth: number,
+    naturalHeight: number,
+  ): { x: number; y: number } {
+    const { x: localX, y: localY } = MaskEditor.globalToElementLocalDisplay(
+      globalPoint,
+      element,
+    );
 
     const normalizedX = localX / element.width;
     const normalizedY = localY / element.height;
