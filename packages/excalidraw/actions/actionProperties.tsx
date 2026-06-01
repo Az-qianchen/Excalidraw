@@ -19,13 +19,12 @@ import {
   arrayToMap,
   getFontFamilyString,
   getLineHeight,
-  isTransparent,
   reduceToCommonValue,
   invariant,
   FONT_SIZES,
 } from "@excalidraw/common";
 
-import { canBecomePolygon, getNonDeletedElements } from "@excalidraw/element";
+import { getNonDeletedElements } from "@excalidraw/element";
 
 import {
   bindBindingElement,
@@ -49,7 +48,6 @@ import {
   isElbowArrow,
   isImageElement,
   isLinearElement,
-  isLineElement,
   isTextElement,
   isUsingAdaptiveRadius,
 } from "@excalidraw/element";
@@ -59,7 +57,6 @@ import { hasStrokeColor } from "@excalidraw/element";
 import {
   updateElbowArrowPoints,
   CaptureUpdateAction,
-  toggleLinePolygonState,
 } from "@excalidraw/element";
 
 import { deriveStylesPanelMode } from "@excalidraw/common";
@@ -400,33 +397,11 @@ export const actionChangeBackgroundColor = register<
       };
     }
 
-    let nextElements;
-
-    const selectedElements = app.scene.getSelectedElements(appState);
-    const shouldEnablePolygon =
-      !isTransparent(value.currentItemBackgroundColor) &&
-      selectedElements.every(
-        (el) => isLineElement(el) && canBecomePolygon(el.points),
-      );
-
-    if (shouldEnablePolygon) {
-      const selectedElementsMap = arrayToMap(selectedElements);
-      nextElements = elements.map((el) => {
-        if (selectedElementsMap.has(el.id) && isLineElement(el)) {
-          return newElementWith(el, {
-            backgroundColor: value.currentItemBackgroundColor,
-            ...toggleLinePolygonState(el, true),
-          });
-        }
-        return el;
-      });
-    } else {
-      nextElements = changeProperty(elements, appState, (el) =>
-        newElementWith(el, {
-          backgroundColor: value.currentItemBackgroundColor,
-        }),
-      );
-    }
+    const nextElements = changeProperty(elements, appState, (el) =>
+      newElementWith(el, {
+        backgroundColor: value.currentItemBackgroundColor,
+      }),
+    );
 
     return {
       elements: nextElements,
