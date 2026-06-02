@@ -205,7 +205,7 @@ export const getCurvePathOps = (shape: Drawable): Op[] => {
       return set.ops;
     }
   }
-  return shape.sets[0].ops;
+  return shape.sets[0]?.ops ?? [];
 };
 
 // linear

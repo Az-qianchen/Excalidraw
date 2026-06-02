@@ -904,21 +904,25 @@ const _generateElementShape = (
         if (options.fill) {
           // 有背景填充的线条元素
           if (element.type === "line" && !isPathALoop(element.points)) {
-            // 非闭合线条带背景：使用 linearPath 生成描边，单独添加填充形状
             shape = [
               generator.linearPath(
                 points as unknown as RoughPoint[],
                 options,
               ),
             ];
-            // 使用 curve 生成填充形状（不会自动闭合路径）
-            const fillOptions = {
-              ...options,
-              stroke: "none",
-            };
-            shape.unshift(
-              generator.curve(points as unknown as RoughPoint[], fillOptions),
-            );
+            if (points.length >= 3) {
+              const fillOptions = {
+                ...options,
+                stroke: "none",
+              };
+              const d = points
+                .map(
+                  (p, i) =>
+                    `${i === 0 ? "M" : "L"}${p[0]} ${p[1]}`,
+                )
+                .join("");
+              shape.unshift(generator.path(d, fillOptions));
+            }
           } else {
             // 闭合路径或非线条元素：使用 polygon（会自动闭合）
             shape = [

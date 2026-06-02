@@ -669,7 +669,15 @@ export const getMinMaxXYFromCurvePathOps = (
         limits.maxX = Math.max(limits.maxX, maxX);
         limits.maxY = Math.max(limits.maxY, maxY);
       } else if (op === "lineTo") {
-        // TODO: Implement this
+        const p: GlobalPoint | undefined = pointFromArray(data);
+        invariant(p != null, "Op data is not a point");
+        const targetP = transformXY ? transformXY(p) : p;
+        const _currentP = transformXY ? transformXY(currentP) : currentP;
+        limits.minX = Math.min(limits.minX, _currentP[0], targetP[0]);
+        limits.minY = Math.min(limits.minY, _currentP[1], targetP[1]);
+        limits.maxX = Math.max(limits.maxX, _currentP[0], targetP[0]);
+        limits.maxY = Math.max(limits.maxY, _currentP[1], targetP[1]);
+        currentP = p;
       } else if (op === "qcurveTo") {
         // TODO: Implement this
       }
