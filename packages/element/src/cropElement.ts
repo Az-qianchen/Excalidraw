@@ -636,8 +636,14 @@ export const detectContentBounds = (
         maxY = y;
         found = true;
       } else {
+        if (x < minX) {
+          minX = x;
+        }
         if (x > maxX) {
           maxX = x;
+        }
+        if (y < minY) {
+          minY = y;
         }
         if (y > maxY) {
           maxY = y;
