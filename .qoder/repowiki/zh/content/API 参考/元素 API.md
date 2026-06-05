@@ -9,6 +9,8 @@
 - [packages/element/src/utils.ts](file://packages/element/src/utils.ts)
 - [packages/element/src/renderElement.ts](file://packages/element/src/renderElement.ts)
 - [packages/element/src/transform.ts](file://packages/element/src/transform.ts)
+- [packages/element/src/textElement.ts](file://packages/element/src/textElement.ts)
+- [packages/element/src/textElement.test.ts](file://packages/element/src/textElement.test.ts)
 - [packages/element/package.json](file://packages/element/package.json)
 - [packages/math/src/types.ts](file://packages/math/src/types.ts)
 - [packages/utils/src/shape.ts](file://packages/utils/src/shape.ts)
@@ -18,9 +20,16 @@
 - [packages/excalidraw/scene/export.ts](file://packages/excalidraw/scene/export.ts)
 - [packages/excalidraw/actions/actionStyles.ts](file://packages/excalidraw/actions/actionStyles.ts)
 - [packages/excalidraw/actions/actionProperties.tsx](file://packages/excalidraw/actions/actionProperties.tsx)
-- [packages/element/tests/frame.test.tsx](file://packages/element/tests/frame.test.tsx)
-- [packages/element/tests/binding.test.tsx](file://packages/element/tests/binding.test.tsx)
+- [packages/excalidraw/wysiwyg/textEditorState.ts](file://packages/excalidraw/wysiwyg/textEditorState.ts)
+- [packages/excalidraw/wysiwyg/textWysiwyg.tsx](file://packages/excalidraw/wysiwyg/textWysiwyg.tsx)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 新增多跨度文本颜色应用支持的详细说明
+- 更新文本元素 API，包含 TextSpan 类型和相关操作函数
+- 添加文本编辑器状态管理功能说明
+- 更新文本渲染和格式化相关 API
 
 ## 目录
 1. [简介](#简介)
@@ -37,6 +46,8 @@
 ## 简介
 本文件为 Excalidraw 元素系统的完整 API 文档，覆盖几何元素（矩形、椭圆、菱形）、线性元素（直线、箭头）、自由绘制、文本、图像、帧与 iframe/可嵌入元素等类型。文档从类型定义、属性与方法、坐标系统与变换、碰撞检测、序列化与反序列化、验证与约束、性能优化以及继承与扩展机制等方面进行系统阐述，并提供可视化图示帮助理解。
 
+**更新** 本次更新重点加强了文本编辑 API 的文档，特别是新增的多跨度文本颜色应用支持功能。
+
 ## 项目结构
 元素系统主要位于 @excalidraw/element 包中，核心文件包括：
 - 类型定义：定义所有元素类型及其属性、映射类型与工具类型
@@ -44,7 +55,8 @@
 - 距离与碰撞：计算点到元素距离、旋转后边界点、碰撞检测
 - 工具函数：元素形状分解、绑定与固定点、线性元素编辑器等
 - 渲染：基于 roughjs 的渲染流程与图像裁剪
-- 变换：将“骨架”元素转换为具体元素（如矩形、箭头）
+- 变换：将"骨架"元素转换为具体元素（如矩形、箭头）
+- 文本处理：多跨度文本格式化、颜色应用、换行处理
 
 ```mermaid
 graph TB
@@ -56,6 +68,11 @@ L["collision.ts<br/>碰撞检测"]
 U["utils.ts<br/>工具函数"]
 R["renderElement.ts<br/>渲染"]
 TR["transform.ts<br/>元素转换"]
+TE["textElement.ts<br/>文本处理"]
+end
+subgraph "WYSIWYG编辑器"
+TES["textEditorState.ts<br/>编辑器状态"]
+TWT["textWysiwyg.tsx<br/>所见即所得编辑器"]
 end
 M["packages/math/src/types.ts<br/>数学类型(Polygon/Curve/Ellipse)"]
 S["packages/utils/src/shape.ts<br/>形状抽象"]
@@ -65,10 +82,13 @@ T --> L
 T --> U
 T --> R
 T --> TR
+T --> TE
 U --> L
 U --> D
 U --> R
 U --> TR
+TE --> TES
+TES --> TWT
 M --> U
 M --> L
 M --> R
@@ -83,6 +103,9 @@ S --> U
 - [packages/element/src/utils.ts:1-62](file://packages/element/src/utils.ts#L1-L62)
 - [packages/element/src/renderElement.ts:442-489](file://packages/element/src/renderElement.ts#L442-L489)
 - [packages/element/src/transform.ts:529-571](file://packages/element/src/transform.ts#L529-L571)
+- [packages/element/src/textElement.ts:47-96](file://packages/element/src/textElement.ts#L47-L96)
+- [packages/excalidraw/wysiwyg/textEditorState.ts:1-211](file://packages/excalidraw/wysiwyg/textEditorState.ts#L1-L211)
+- [packages/excalidraw/wysiwyg/textWysiwyg.tsx:200-243](file://packages/excalidraw/wysiwyg/textWysiwyg.tsx#L200-L243)
 - [packages/math/src/types.ts:115-162](file://packages/math/src/types.ts#L115-L162)
 - [packages/utils/src/shape.ts:37-77](file://packages/utils/src/shape.ts#L37-L77)
 
@@ -95,18 +118,21 @@ S --> U
 - 映射与集合：ElementsMap、SceneElementsMap、非删除元素映射等
 - 绑定与固定点：支持在元素边界上绑定箭头起点/终点
 - 帧系统：元素可归属到帧内，支持插入顺序与层级控制
+- **新增** 多跨度文本系统：支持富文本格式化，包括颜色、字体等样式
 
 **章节来源**
 - [packages/element/src/types.ts:40-238](file://packages/element/src/types.ts#L40-L238)
 - [packages/element/src/types.ts:286-324](file://packages/element/src/types.ts#L286-L324)
+- [packages/element/src/types.ts:252-255](file://packages/element/src/types.ts#L252-L255)
 
 ## 架构总览
-元素系统围绕“类型安全 + 可序列化 + 可协作”的设计目标构建：
+元素系统围绕"类型安全 + 可序列化 + 可协作"的设计目标构建：
 - 类型安全：通过联合类型与只读属性确保元素结构稳定
 - 序列化：元素 JSON 可在网络间共享，包含版本与索引用于协作同步
 - 协作：使用分数索引维护多端顺序一致性
 - 渲染：统一生成形状并交由渲染层绘制
 - 编辑：线性元素提供编辑器，支持点位更新、绑定与肘形箭头
+- **新增** 文本编辑：支持多跨度文本格式化，包括颜色应用、换行处理、选区管理
 
 ```mermaid
 classDiagram
@@ -127,6 +153,10 @@ class ExcalidrawFrameElement
 class ExcalidrawMagicFrameElement
 class ExcalidrawIframeElement
 class ExcalidrawEmbeddableElement
+class TextSpan {
++text : string
++color? : string
+}
 ExcalidrawElement <|-- ExcalidrawGenericElement
 ExcalidrawGenericElement <|-- ExcalidrawRectangleElement
 ExcalidrawGenericElement <|-- ExcalidrawEllipseElement
@@ -141,10 +171,12 @@ ExcalidrawElement <|-- ExcalidrawFrameElement
 ExcalidrawElement <|-- ExcalidrawMagicFrameElement
 ExcalidrawElement <|-- ExcalidrawIframeElement
 ExcalidrawElement <|-- ExcalidrawEmbeddableElement
+ExcalidrawTextElement --> TextSpan
 ```
 
 **图表来源**
 - [packages/element/src/types.ts:190-233](file://packages/element/src/types.ts#L190-L233)
+- [packages/element/src/types.ts:252-255](file://packages/element/src/types.ts#L252-L255)
 
 ## 详细组件分析
 
@@ -177,6 +209,7 @@ SetVersion --> Done(["完成"])
 - 属性要点：字体大小、字体族、对齐、垂直对齐、自动换行、容器 ID、原始文本、行高、富文本跨度
 - 容器：可依附于矩形/椭圆/菱形/箭头等元素
 - 尺寸：autoResize 控制宽度适配文本或强制换行
+- **新增** 多跨度格式化：支持 TextSpan 数组，每段文本可独立设置颜色
 
 ```mermaid
 flowchart TD
@@ -184,11 +217,13 @@ TStart(["创建文本元素"]) --> SetText["设置文本内容"]
 SetText --> SetFont["设置字体/字号/对齐"]
 SetFont --> SetAuto["设置自动换行"]
 SetAuto --> SetContainer["设置容器(可选)"]
-SetContainer --> TDone(["完成"])
+SetContainer --> SetSpans["设置富文本跨度(可选)"]
+SetSpans --> TDone(["完成"])
 ```
 
 **图表来源**
 - [packages/element/src/types.ts:257-284](file://packages/element/src/types.ts#L257-L284)
+- [packages/element/src/types.ts:252-255](file://packages/element/src/types.ts#L252-L255)
 
 **章节来源**
 - [packages/element/src/types.ts:297-301](file://packages/element/src/types.ts#L297-L301)
@@ -289,7 +324,7 @@ class ExcalidrawEmbeddableElement
 - 全局坐标：元素的 x/y 表示左上角在全局画布中的位置
 - 角度：以弧度表示元素整体旋转
 - 形状与边界：通过旋转中心与边界点计算旋转后的四个顶点，用于碰撞检测与选择框
-- 变换流程：将“骨架”元素（如未指定宽高的标签）转换为具体元素（如矩形/箭头），并设置默认尺寸与点序列
+- 变换流程：将"骨架"元素（如未指定宽高的标签）转换为具体元素（如矩形/箭头），并设置默认尺寸与点序列
 
 ```mermaid
 flowchart TD
@@ -413,15 +448,56 @@ Export-->>UI : 文件/数据
 - 碰撞与距离：优先按类型分发，减少不必要的复杂计算
 - 渲染：仅在图像初始化后绘制，避免异步资源导致的闪烁
 - 线性元素：批量更新点位时合并操作，减少重绘次数
+- **新增** 文本格式化：多跨度文本的合并与缓存，减少重复计算
 
 **章节来源**
 - [packages/element/src/utils.ts:414-463](file://packages/element/src/utils.ts#L414-L463)
 - [packages/element/src/renderElement.ts:459-489](file://packages/element/src/renderElement.ts#L459-L489)
 
+### 文本编辑 API（新增）
+**更新** 新增对多跨度文本颜色应用的完整支持
+
+#### TextSpan 类型
+- text：文本内容
+- color：可选的颜色值，支持 CSS 颜色格式
+- 用途：定义富文本的最小格式单元
+
+#### 文本颜色应用函数
+- applyColorToSpans：对指定范围内的 span 应用颜色
+- updateSpansOnTextChange：文本内容变化时更新 span 数组
+- mergeAdjacentSpans：合并相邻且颜色相同的 span
+
+#### 文本编辑器状态管理
+- registerTextEditor：注册文本编辑器实例
+- unregisterTextEditor：注销文本编辑器实例
+- applyColorToTextSelection：对当前选中的文本应用颜色
+- getTextSelection：获取当前文本选区位置
+
+```mermaid
+flowchart TD
+A["用户选择文本颜色"] --> B["applyColorToTextSelection"]
+B --> C["查找活跃编辑器"]
+C --> D["applyColorToSelection"]
+D --> E["applyColorToSpans"]
+E --> F["拆分现有span"]
+F --> G["应用新颜色"]
+G --> H["mergeAdjacentSpans"]
+H --> I["返回更新后的span数组"]
+```
+
+**图表来源**
+- [packages/excalidraw/wysiwyg/textEditorState.ts:26-91](file://packages/excalidraw/wysiwyg/textEditorState.ts#L26-L91)
+- [packages/excalidraw/wysiwyg/textEditorState.ts:98-189](file://packages/excalidraw/wysiwyg/textEditorState.ts#L98-L189)
+
+**章节来源**
+- [packages/excalidraw/wysiwyg/textEditorState.ts:1-211](file://packages/excalidraw/wysiwyg/textEditorState.ts#L1-L211)
+- [packages/element/src/textElement.ts:47-96](file://packages/element/src/textElement.ts#L47-L96)
+
 ## 依赖分析
 - 数学类型：Polygon/Curve/Ellipse 为形状建模提供基础
 - 形状抽象：统一折线段、曲线段与椭圆描述
 - 元素类型：依赖数学类型进行距离与碰撞计算
+- **新增** 文本处理：依赖 TextSpan 类型和相关处理函数
 
 ```mermaid
 graph LR
@@ -431,12 +507,17 @@ Distance["distance.ts(距离)"] --> Math
 Collision["collision.ts(碰撞)"] --> Math
 Render["renderElement.ts(渲染)"] --> Math
 ShapeAbstraction["utils/shape.ts(形状抽象)"] --> Math
+TextElement["textElement.ts(文本处理)"] --> Types
+TextEditor["textEditorState.ts(编辑器状态)"] --> Types
+TextWysiwyg["textWysiwyg.tsx(所见即所得)"] --> TextEditor
 ```
 
 **图表来源**
 - [packages/element/src/types.ts:1-33](file://packages/element/src/types.ts#L1-L33)
 - [packages/math/src/types.ts:115-162](file://packages/math/src/types.ts#L115-L162)
 - [packages/utils/src/shape.ts:37-77](file://packages/utils/src/shape.ts#L37-L77)
+- [packages/element/src/textElement.ts:1-50](file://packages/element/src/textElement.ts#L1-L50)
+- [packages/excalidraw/wysiwyg/textEditorState.ts:1-20](file://packages/excalidraw/wysiwyg/textEditorState.ts#L1-L20)
 
 **章节来源**
 - [packages/math/src/types.ts:115-162](file://packages/math/src/types.ts#L115-L162)
@@ -447,14 +528,14 @@ ShapeAbstraction["utils/shape.ts(形状抽象)"] --> Math
 - 批处理：在批量更新元素属性时合并渲染请求
 - 选择性渲染：图像元素仅在初始化完成后绘制，减少无效绘制
 - 碰撞预判：先按类型快速判断，再进行精确计算
-
-[本节为通用指导，无需特定文件来源]
+- **新增** 文本格式化缓存：多跨度文本的合并结果可缓存，避免重复计算
 
 ## 故障排查指南
 - 剪贴板解析失败：确认写入的 JSON 格式正确，或回退到纯文本解析
 - 导出空场景：检查元素数组是否为空或仅包含删除元素
-- 帧插入异常：确认帧未锁定，且插入顺序符合“在帧之后、在下一个非帧元素之前”
+- 帧插入异常：确认帧未锁定，且插入顺序符合"在帧之后、在下一个非帧元素之前"
 - 绑定失效：检查固定点比例是否在 0~1 范围内，绑定模式是否匹配
+- **新增** 文本颜色应用失败：检查 TextSpan 数组格式是否正确，颜色值是否为有效 CSS 格式
 
 **章节来源**
 - [packages/excalidraw/clipboard.test.ts:1-90](file://packages/excalidraw/clipboard.test.ts#L1-L90)
@@ -464,12 +545,14 @@ ShapeAbstraction["utils/shape.ts(形状抽象)"] --> Math
 ## 结论
 元素系统通过严格的类型体系、可序列化结构与完善的协作支持，实现了跨平台、可扩展的图形编辑能力。围绕几何、文本、图像、线性与帧/iframe 的统一抽象，配合距离与碰撞算法、渲染管线与变换流程，既保证了易用性也兼顾了性能与可维护性。
 
-[本节为总结，无需特定文件来源]
+**更新** 新增的多跨度文本颜色应用功能进一步增强了文本编辑体验，支持细粒度的文本格式化需求。
 
 ## 附录
 - 示例骨架元素：包含矩形、菱形（带标签）、箭头（带起点/终点）、图像、帧等
-- 关键类型参考：元素基类、映射类型、绑定类型、箭头样式枚举等
+- 关键类型参考：元素基类、映射类型、绑定类型、箭头样式枚举、TextSpan 类型等
+- **新增** 文本编辑器 API：注册、注销、颜色应用、选区管理等功能
 
 **章节来源**
 - [examples/with-script-in-browser/initialData.tsx:4-46](file://examples/with-script-in-browser/initialData.tsx#L4-L46)
 - [packages/element/src/types.ts:40-238](file://packages/element/src/types.ts#L40-L238)
+- [packages/excalidraw/wysiwyg/textEditorState.ts:13-47](file://packages/excalidraw/wysiwyg/textEditorState.ts#L13-L47)

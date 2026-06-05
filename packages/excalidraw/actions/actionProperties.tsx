@@ -156,6 +156,11 @@ import { getShortcutKey } from "../shortcut";
 
 import { register } from "./register";
 
+import {
+  applyColorToTextSelection,
+  getTextSelection,
+} from "../wysiwyg/textEditorState";
+
 import type { AppClassProperties, AppState, Primitive } from "../types";
 
 const FONT_SIZE_RELATIVE_INCREASE_STEP = 0.1;
@@ -325,6 +330,26 @@ export const actionChangeStrokeColor = register<
   label: "labels.stroke",
   trackEvent: false,
   perform: (elements, appState, value) => {
+    if (value?.currentItemStrokeColor && appState.editingTextElement) {
+      const editingId = appState.editingTextElement.id;
+      const selection = getTextSelection(editingId);
+      if (selection && selection.start !== selection.end) {
+        const applied = applyColorToTextSelection(
+          editingId,
+          value.currentItemStrokeColor,
+        );
+        if (applied) {
+          return {
+            appState: {
+              ...appState,
+              ...value,
+            },
+            captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+          };
+        }
+      }
+    }
+
     return {
       ...(value?.currentItemStrokeColor && {
         elements: changeProperty(

@@ -9,6 +9,7 @@ import type { Radians } from "@excalidraw/math";
 import type { Mutable } from "@excalidraw/common/utility-types";
 
 import { ShapeCache } from "./shape";
+import { elementWithCanvasCache } from "./renderElement";
 
 import { updateElbowArrowPoints } from "./elbowArrow";
 
@@ -134,6 +135,10 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
     typeof points !== "undefined"
   ) {
     ShapeCache.delete(element);
+  }
+
+  if (typeof (updates as any).spans !== "undefined") {
+    elementWithCanvasCache.delete(element);
   }
 
   element.version = updates.version ?? element.version + 1;

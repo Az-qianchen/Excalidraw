@@ -2,6 +2,7 @@ import {
   getCommonFrameId,
   getFrameChildrenInsertionIndex,
   isElementInViewport,
+  isTextElement,
 } from "@excalidraw/element";
 
 import { arrayToMap, memoize, toBrandedType } from "@excalidraw/common";
@@ -105,10 +106,13 @@ export class Renderer {
 
       // we don't want to render text element that's being currently edited
       // (it's rendered on remote only)
+      // 例外：如果文本包含 span（富文本格式），则在画布上渲染，
+      // 以便在编辑时可以看到彩色文本
       if (
         !editingTextElement ||
         editingTextElement.type !== "text" ||
-        element.id !== editingTextElement.id
+        element.id !== editingTextElement.id ||
+        (isTextElement(element) && element.spans && element.spans.length > 0)
       ) {
         elementsMap.set(element.id, element);
       }

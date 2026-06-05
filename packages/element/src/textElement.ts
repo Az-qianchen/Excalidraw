@@ -41,7 +41,28 @@ import type {
   ExcalidrawTextElement,
   ExcalidrawTextElementWithContainer,
   NonDeletedExcalidrawElement,
+  TextSpan,
 } from "./types";
+
+/**
+ * 根据 span 文本中的换行符将 TextSpan 数组拆分为多行。
+ * 每一行是一个 TextSpan 数组。
+ */
+export const splitSpansIntoLines = (spans: readonly TextSpan[]): TextSpan[][] => {
+  const lines: TextSpan[][] = [[]];
+  for (const span of spans) {
+    const parts = span.text.split("\n");
+    for (let i = 0; i < parts.length; i++) {
+      if (i > 0) {
+        lines.push([]);
+      }
+      if (parts[i]) {
+        lines[lines.length - 1].push({ text: parts[i], color: span.color });
+      }
+    }
+  }
+  return lines;
+};
 
 export const redrawTextBoundingBox = (
   textElement: ExcalidrawTextElement,

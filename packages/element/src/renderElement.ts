@@ -81,6 +81,7 @@ import type {
   ImageHSLA,
 } from "./types";
 import { DEFAULT_IMAGE_HSLA } from "./types";
+import { splitSpansIntoLines } from "./textElement";
 
 import type { RoughCanvas } from "roughjs/bin/canvas";
 
@@ -614,12 +615,44 @@ const drawElementOnCanvas = (
           lineHeightPx,
         );
 
-        for (let index = 0; index < lines.length; index++) {
-          context.fillText(
-            lines[index],
-            horizontalOffset,
-            index * lineHeightPx + verticalOffset,
-          );
+        if (element.spans && element.spans.length > 0) {
+          const spanLines = splitSpansIntoLines(element.spans);
+          for (let lineIndex = 0; lineIndex < spanLines.length; lineIndex++) {
+            const y = lineIndex * lineHeightPx + verticalOffset;
+            const lineSpans = spanLines[lineIndex];
+
+            // 多 span 渲染时始终从左到右绘制，
+            // 因此根据对齐方式计算正确的起始 x 坐标。
+            let x = horizontalOffset;
+            if (element.textAlign === "center" || element.textAlign === "right") {
+              const lineWidth = lineSpans.reduce(
+                (w, span) => w + context.measureText(span.text).width, 0,
+              );
+              if (element.textAlign === "center") {
+                x = (element.width - lineWidth) / 2;
+              } else {
+                x = element.width - lineWidth;
+              }
+            }
+
+            for (const span of lineSpans) {
+              const spanColor = span.color || element.strokeColor;
+              context.fillStyle =
+                renderConfig.theme === THEME.DARK
+                  ? applyDarkModeFilter(spanColor)
+                  : spanColor;
+              context.fillText(span.text, x, y);
+              x += context.measureText(span.text).width;
+            }
+          }
+        } else {
+          for (let index = 0; index < lines.length; index++) {
+            context.fillText(
+              lines[index],
+              horizontalOffset,
+              index * lineHeightPx + verticalOffset,
+            );
+          }
         }
         context.restore();
         if (shouldTemporarilyAttach) {

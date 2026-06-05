@@ -36,6 +36,7 @@ import { getCornerRadius, isPathALoop } from "@excalidraw/element";
 import { ShapeCache, getDashArrayDashed, getDashArrayDotted } from "@excalidraw/element";
 
 import { getElementAbsoluteCoords } from "@excalidraw/element";
+import { splitSpansIntoLines } from "@excalidraw/element";
 
 import type {
   ExcalidrawElement,
@@ -675,7 +676,6 @@ const renderElementToSvg = (
             offsetY || 0
           }) rotate(${degree} ${cx} ${cy})`,
         );
-        const lines = element.text.replace(/\r\n?/g, "\n").split("\n");
         const lineHeightPx = getLineHeightInPx(
           element.fontSize,
           element.lineHeight,
@@ -698,24 +698,55 @@ const renderElementToSvg = (
             : element.textAlign === "right" || direction === "rtl"
             ? "end"
             : "start";
-        for (let i = 0; i < lines.length; i++) {
-          const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
-          text.textContent = lines[i];
-          text.setAttribute("x", `${horizontalOffset}`);
-          text.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
-          text.setAttribute("font-family", getFontFamilyString(element));
-          text.setAttribute("font-size", `${element.fontSize}px`);
-          text.setAttribute(
-            "fill",
-            renderConfig.theme === THEME.DARK
-              ? applyDarkModeFilter(element.strokeColor)
-              : element.strokeColor,
-          );
-          text.setAttribute("text-anchor", textAnchor);
-          text.setAttribute("style", "white-space: pre;");
-          text.setAttribute("direction", direction);
-          text.setAttribute("dominant-baseline", "alphabetic");
-          node.appendChild(text);
+
+        if (element.spans && element.spans.length > 0) {
+          const spanLines = splitSpansIntoLines(element.spans);
+          for (let i = 0; i < spanLines.length; i++) {
+            const textEl = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
+            textEl.setAttribute("x", `${horizontalOffset}`);
+            textEl.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
+            textEl.setAttribute("font-family", getFontFamilyString(element));
+            textEl.setAttribute("font-size", `${element.fontSize}px`);
+            textEl.setAttribute("text-anchor", textAnchor);
+            textEl.setAttribute("style", "white-space: pre;");
+            textEl.setAttribute("direction", direction);
+            textEl.setAttribute("dominant-baseline", "alphabetic");
+
+            for (const span of spanLines[i]) {
+              const tspan = svgRoot.ownerDocument.createElementNS(SVG_NS, "tspan");
+              tspan.textContent = span.text;
+              const spanColor = span.color || element.strokeColor;
+              tspan.setAttribute(
+                "fill",
+                renderConfig.theme === THEME.DARK
+                  ? applyDarkModeFilter(spanColor)
+                  : spanColor,
+              );
+              textEl.appendChild(tspan);
+            }
+            node.appendChild(textEl);
+          }
+        } else {
+          const lines = element.text.replace(/\r\n?/g, "\n").split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
+            text.textContent = lines[i];
+            text.setAttribute("x", `${horizontalOffset}`);
+            text.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
+            text.setAttribute("font-family", getFontFamilyString(element));
+            text.setAttribute("font-size", `${element.fontSize}px`);
+            text.setAttribute(
+              "fill",
+              renderConfig.theme === THEME.DARK
+                ? applyDarkModeFilter(element.strokeColor)
+                : element.strokeColor,
+            );
+            text.setAttribute("text-anchor", textAnchor);
+            text.setAttribute("style", "white-space: pre;");
+            text.setAttribute("direction", direction);
+            text.setAttribute("dominant-baseline", "alphabetic");
+            node.appendChild(text);
+          }
         }
 
         const g = maybeWrapNodesInFrameClipPath(

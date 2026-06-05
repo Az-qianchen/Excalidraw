@@ -249,6 +249,11 @@ export type NonDeleted<TElement extends ExcalidrawElement> = TElement & {
 
 export type NonDeletedExcalidrawElement = NonDeleted<ExcalidrawElement>;
 
+export type TextSpan = Readonly<{
+  text: string;
+  color?: string;
+}>;
+
 export type ExcalidrawTextElement = _ExcalidrawElementBase &
   Readonly<{
     type: "text";
@@ -271,6 +276,11 @@ export type ExcalidrawTextElement = _ExcalidrawElementBase &
      *  with font size (using `getLineHeightInPx` helper).
      */
     lineHeight: number & { _brand: "unitlessLineHeight" };
+    /**
+     * 富文本 span，用于内联格式（如颜色）。
+     * 如果不存在，则以统一样式渲染文本。
+     */
+    spans?: readonly TextSpan[];
   }>;
 
 export type ExcalidrawBindableElement =

@@ -74,6 +74,12 @@ import type { ParsedDataTranferList } from "../clipboard";
 
 import type App from "../components/App";
 import type { AppState } from "../types";
+import {
+  registerTextEditor,
+  unregisterTextEditor,
+  applyColorToSpans,
+  updateSpansOnTextChange,
+} from "./textEditorState";
 
 const getTransform = (
   width: number,
@@ -374,6 +380,7 @@ export const textWysiwyg = ({
       // Make sure text editor height doesn't go beyond viewport
       const editorMaxHeight =
         (appState.height - viewportY) / appState.zoom.value;
+      const hasSpans = updatedTextElement.spans && updatedTextElement.spans.length > 0;
       Object.assign(editable.style, {
         font,
         // must be defined *after* font ¯\_(ツ)_/¯
@@ -392,10 +399,16 @@ export const textWysiwyg = ({
         ),
         textAlign,
         verticalAlign,
-        color:
-          appState.theme === THEME.DARK
+        color: hasSpans
+          ? "transparent"
+          : appState.theme === THEME.DARK
             ? applyDarkModeFilter(updatedTextElement.strokeColor)
             : updatedTextElement.strokeColor,
+        caretColor: hasSpans
+          ? appState.theme === THEME.DARK
+            ? "#fff"
+            : "#000"
+          : undefined,
         opacity: updatedTextElement.opacity / 100,
         maxHeight: `${editorMaxHeight}px`,
       });
@@ -459,8 +472,52 @@ export const textWysiwyg = ({
     overflowWrap: "break-word",
     boxSizing: "content-box",
   });
+
+  if (element.spans && element.spans.length > 0) {
+    editable.style.color = "transparent";
+    // 使用元素笔触颜色作为光标颜色，确保在任意背景下可见
+    editable.style.caretColor = element.strokeColor;
+  }
+
   editable.value = element.originalText;
   updateWysiwygStyle();
+
+  let currentSelection: { start: number; end: number } | null = null;
+
+  const updateSelection = () => {
+    // 仅当编辑器处于聚焦状态时更新选区
+    if (document.activeElement === editable) {
+      currentSelection = {
+        start: editable.selectionStart,
+        end: editable.selectionEnd,
+      };
+    }
+  };
+
+  document.addEventListener("selectionchange", updateSelection);
+
+  const handleApplyColor = (color: string) => {
+    if (!currentSelection || currentSelection.start === currentSelection.end) {
+      return;
+    }
+    const updatedElement = app.scene.getElement<ExcalidrawTextElement>(id);
+    if (!updatedElement || !isTextElement(updatedElement)) {
+      return;
+    }
+    const newSpans = applyColorToSpans(
+      updatedElement.originalText,
+      updatedElement.spans,
+      currentSelection.start,
+      currentSelection.end,
+      color,
+    );
+    app.scene.mutateElement(updatedElement, { spans: newSpans });
+  };
+
+  registerTextEditor(id, {
+    getSelection: () => currentSelection,
+    applyColorToSelection: handleApplyColor,
+  });
 
   const getCaretIndexFromInitialSceneCoords = () => {
     if (!initialCaretSceneCoords || !currentTextLayout) {
@@ -612,6 +669,17 @@ export const textWysiwyg = ({
       }
     };
 
+    let previousText = editable.value;
+    let isComposing = false;
+
+    editable.addEventListener("compositionstart", () => {
+      isComposing = true;
+    });
+    editable.addEventListener("compositionend", () => {
+      isComposing = false;
+      previousText = editable.value;
+    });
+
     editable.oninput = () => {
       const normalized = normalizeText(editable.value);
       if (editable.value !== normalized) {
@@ -622,6 +690,24 @@ export const textWysiwyg = ({
         editable.selectionStart = selectionStart;
         editable.selectionEnd = selectionStart;
       }
+
+      // IME 组合输入期间跳过 span 更新，避免破坏格式追踪
+      if (!isComposing) {
+        const updatedElement = app.scene.getElement<ExcalidrawTextElement>(id);
+        if (updatedElement && isTextElement(updatedElement) && updatedElement.spans) {
+          const newSpans = updateSpansOnTextChange(
+            previousText,
+            editable.value,
+            updatedElement.spans,
+            editable.selectionEnd,
+          );
+          if (newSpans) {
+            app.scene.mutateElement(updatedElement, { spans: newSpans });
+          }
+        }
+        previousText = editable.value;
+      }
+
       onChange(editable.value);
     };
   }
@@ -843,6 +929,9 @@ export const textWysiwyg = ({
     editable.onblur = null;
     editable.oninput = null;
     editable.onkeydown = null;
+
+    document.removeEventListener("selectionchange", updateSelection);
+    unregisterTextEditor(id);
 
     if (observer) {
       observer.disconnect();
