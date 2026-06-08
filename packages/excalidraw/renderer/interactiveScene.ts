@@ -1600,6 +1600,155 @@ const renderMaskEditor = (
   }
 };
 
+// ==================== 元素尺寸标签 ====================
+const SIZE_LABEL_FONT_SIZE = 12;
+const SIZE_LABEL_FONT_WEIGHT = "600";
+const SIZE_LABEL_FONT_FAMILY = "Inter, system-ui, sans-serif";
+const SIZE_LABEL_FONT = `${SIZE_LABEL_FONT_WEIGHT} ${SIZE_LABEL_FONT_SIZE}px ${SIZE_LABEL_FONT_FAMILY}`;
+const SIZE_LABEL_PADDING_X = 10;
+const SIZE_LABEL_PADDING_Y = 4;
+const SIZE_LABEL_OFFSET_PX = 14;
+
+let _sizeLabelMeasureCanvas: HTMLCanvasElement | null = null;
+let _sizeLabelMeasureCtx: CanvasRenderingContext2D | null = null;
+
+const measureSizeLabelText = (text: string): number => {
+  if (typeof document === "undefined") {
+    return text.length * 7;
+  }
+  if (!_sizeLabelMeasureCanvas) {
+    _sizeLabelMeasureCanvas = document.createElement("canvas");
+    _sizeLabelMeasureCtx = _sizeLabelMeasureCanvas.getContext("2d");
+  }
+  if (!_sizeLabelMeasureCtx) {
+    return text.length * 7;
+  }
+  _sizeLabelMeasureCtx.font = SIZE_LABEL_FONT;
+  return _sizeLabelMeasureCtx.measureText(text).width;
+};
+
+const formatDimensionValue = (value: number): string => {
+  if (!isFinite(value)) {
+    return "0";
+  }
+  const absolute = Math.abs(value);
+  const rounded = Math.round(absolute * 100) / 100;
+  if (rounded < 0.01) {
+    return "0";
+  }
+  const fixed = rounded.toFixed(2);
+  return fixed.replace(/\.00$/, "").replace(/(\.\d*[1-9])0$/, "$1");
+};
+
+const renderElementSizeLabel = (
+  context: CanvasRenderingContext2D,
+  appState: InteractiveCanvasAppState,
+  selectedElements: readonly NonDeleted<ExcalidrawElement>[],
+  elementsMap: ElementsMap,
+  selectionColor: string,
+) => {
+  if (selectedElements.length === 0) {
+    return;
+  }
+
+  let width: number;
+  let height: number;
+  let cx: number;
+  let cy: number;
+  let angle: number;
+
+  if (selectedElements.length === 1) {
+    const element = selectedElements[0];
+    const [, , , , absCx, absCy] = getElementAbsoluteCoords(
+      element,
+      elementsMap,
+    );
+    width = element.width;
+    height = element.height;
+    cx = absCx;
+    cy = absCy;
+    angle = element.angle;
+  } else {
+    const [x1, y1, x2, y2] = getCommonBounds(
+      selectedElements,
+      elementsMap,
+    );
+    width = x2 - x1;
+    height = y2 - y1;
+    cx = (x1 + x2) / 2;
+    cy = (y1 + y2) / 2;
+    angle = 0;
+  }
+
+  if (width < 0.01 && height < 0.01) {
+    return;
+  }
+
+  const labelText = `${formatDimensionValue(Math.max(0, width))} \u00d7 ${formatDimensionValue(Math.max(0, height))}`;
+  const textWidth = measureSizeLabelText(labelText);
+  const pillWidth = textWidth + SIZE_LABEL_PADDING_X * 2;
+  const pillHeight = SIZE_LABEL_FONT_SIZE + SIZE_LABEL_PADDING_Y * 2;
+  const pillRadius = pillHeight / 2;
+  const zoom = appState.zoom.value;
+
+  // 计算标签位置：元素底部中心外侧，沿旋转方向偏移
+  // 使用 pointRotateRads 旋转底部中心点，确保与元素旋转方向完全一致
+  const offsetDistance = height / 2 + SIZE_LABEL_OFFSET_PX / zoom;
+  const [labelX, labelY] = pointRotateRads(
+    pointFrom(cx, cy + offsetDistance),
+    pointFrom(cx, cy),
+    angle as Radians,
+  );
+
+  // 规范化标签旋转角度，确保文字始终可读
+  // 标签跟随元素旋转，当文字倾斜超过 90° 时翻转 180° 保持可读性
+  let labelAngle = angle;
+  // 将角度规范化到 [-π/2, π/2] 范围，超出则翻转
+  while (labelAngle > Math.PI / 2) {
+    labelAngle -= Math.PI;
+  }
+  while (labelAngle < -Math.PI / 2) {
+    labelAngle += Math.PI;
+  }
+
+  context.save();
+  context.translate(labelX, labelY);
+  context.rotate(labelAngle);
+  // 缩放以保持屏幕空间大小恒定
+  context.scale(1 / zoom, 1 / zoom);
+
+  // 绘制药丸形背景
+  context.fillStyle = selectionColor || "#4262fa";
+  context.beginPath();
+  if (context.roundRect) {
+    context.roundRect(
+      -pillWidth / 2,
+      -pillHeight / 2,
+      pillWidth,
+      pillHeight,
+      pillRadius,
+    );
+  } else {
+    // roundRect 不可用时的回退方案：绘制矩形
+    context.rect(
+      -pillWidth / 2,
+      -pillHeight / 2,
+      pillWidth,
+      pillHeight,
+    );
+  }
+  context.fill();
+
+  // 绘制尺寸文字
+  context.fillStyle = "#ffffff";
+  context.font = SIZE_LABEL_FONT;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(labelText, 0, 0.5);
+
+  context.restore();
+};
+
 const renderTextBox = (
   text: NonDeleted<ExcalidrawTextElement>,
   context: CanvasRenderingContext2D,
@@ -2051,6 +2200,17 @@ const _renderInteractiveScene = ({
           renderMaskEditor(context, renderConfig, appState, maskingElement);
         }
       }
+
+      // 渲染元素尺寸标签
+      if (showBoundingBox && !isTextElement(appState.editingTextElement)) {
+        renderElementSizeLabel(
+          context,
+          appState,
+          selectedElements,
+          elementsMap,
+          selectionColor,
+        );
+      }
     } else if (
       selectedElements.length > 1 &&
       !appState.isRotating &&
@@ -2098,6 +2258,15 @@ const _renderInteractiveScene = ({
           0,
         );
       }
+
+      // 渲染元素尺寸标签
+      renderElementSizeLabel(
+        context,
+        appState,
+        selectedElements,
+        elementsMap,
+        selectionColor,
+      );
     }
     context.restore();
   }
