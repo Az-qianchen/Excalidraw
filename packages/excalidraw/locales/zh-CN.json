@@ -445,7 +445,15 @@
     "maskCancel": "取消抠图",
     "maskKeepInside": "保留内部",
     "maskKeepOutside": "保留外部",
-    "maskHint": "点击添加顶点，Enter 应用，Esc 取消。"
+    "maskHint": "点击添加顶点，Enter 应用，Esc 取消。",
+    "magicWandStart": "魔法抠图",
+    "magicWandFinish": "应用抠图",
+    "magicWandCancel": "取消抠图",
+    "magicWandThreshold": "容差",
+    "magicWandFeather": "羽化",
+    "magicWandKeepInside": "保留内部",
+    "magicWandKeepOutside": "保留外部",
+    "magicWandContiguous": "连续"
   },
   "clearCanvasDialog": {
     "title": "清除画布"

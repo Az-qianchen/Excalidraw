@@ -467,7 +467,15 @@
     "maskCancel": "Cancel masking",
     "maskKeepInside": "Keep inside",
     "maskKeepOutside": "Keep outside",
-    "maskHint": "Click to add points. Press Enter to apply, Esc to cancel."
+    "maskHint": "Click to add points. Press Enter to apply, Esc to cancel.",
+    "magicWandStart": "Magic cutout",
+    "magicWandFinish": "Apply cutout",
+    "magicWandCancel": "Cancel cutout",
+    "magicWandThreshold": "Threshold",
+    "magicWandFeather": "Feather",
+    "magicWandKeepInside": "Keep inside",
+    "magicWandKeepOutside": "Keep outside",
+    "magicWandContiguous": "Contiguous"
   },
   "clearCanvasDialog": {
     "title": "Clear canvas"

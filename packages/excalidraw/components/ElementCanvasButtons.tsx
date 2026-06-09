@@ -12,8 +12,6 @@ import "./ElementCanvasButtons.scss";
 
 import type { AppState } from "../types";
 
-const CONTAINER_PADDING = 5;
-
 const getContainerCoords = (
   element: NonDeletedExcalidrawElement,
   appState: AppState,
@@ -59,8 +57,6 @@ export const ElementCanvasButtons = ({
       style={{
         top: `${y}px`,
         left: `${x}px`,
-        // width: CONTAINER_WIDTH,
-        padding: CONTAINER_PADDING,
       }}
     >
       {children}

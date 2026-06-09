@@ -242,6 +242,12 @@ export type InteractiveCanvasAppState = Readonly<
     maskingPoints: AppState["maskingPoints"];
     maskingMode: AppState["maskingMode"];
     selectedMaskPointIndex: AppState["selectedMaskPointIndex"];
+    // 魔法抠图
+    magicWandElementId: AppState["magicWandElementId"];
+    magicWandThreshold: AppState["magicWandThreshold"];
+    magicWandFeatherRadius: AppState["magicWandFeatherRadius"];
+    magicWandInverted: AppState["magicWandInverted"];
+    magicWandContiguous: AppState["magicWandContiguous"];
     // Search matches
     searchMatches: AppState["searchMatches"];
     activeLockedId: AppState["activeLockedId"];
@@ -272,6 +278,7 @@ export type ObservedElementsAppState = {
   } | null;
   croppingElementId: AppState["croppingElementId"];
   maskingElementId: AppState["maskingElementId"];
+  magicWandElementId: AppState["magicWandElementId"];
   lockedMultiSelections: AppState["lockedMultiSelections"];
   activeLockedId: AppState["activeLockedId"];
 };
@@ -478,6 +485,13 @@ export interface AppState {
   maskingPoints: GlobalPoint[];
   maskingMode: "keepInside" | "keepOutside";
   selectedMaskPointIndex: number | null;
+
+  /** 魔法抠图（独立于遮罩编辑） */
+  magicWandElementId: ExcalidrawElement["id"] | null;
+  magicWandThreshold: number;
+  magicWandFeatherRadius: number;
+  magicWandInverted: boolean;
+  magicWandContiguous: boolean;
 
   /** null if no search matches found / search closed */
   searchMatches: Readonly<{
@@ -862,6 +876,7 @@ export type AppClassProperties = {
   bindModeHandler: App["bindModeHandler"];
 
   setAppState: App["setAppState"];
+  getMagicWandOverlayData: App["getMagicWandOverlayData"];
 };
 
 export type PointerDownState = Readonly<{

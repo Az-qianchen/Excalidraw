@@ -3,7 +3,8 @@
     flex-wrap: nowrap;
   }
 
-  .buttonList input.stroke-width-input {
+  .buttonList input.stroke-width-input,
+  .excalidraw-canvas-buttons input.stroke-width-input {
     width: 3rem;
     height: var(--default-button-size);
     box-sizing: border-box;

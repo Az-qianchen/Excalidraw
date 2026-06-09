@@ -145,6 +145,7 @@ export type ActionName =
   | "cropEditor"
   | "autoCrop"
   | "maskEditor"
+  | "magicWand"
   | "wrapSelectionInFrame"
   | "toggleLassoTool"
   | "toggleShapeSwitch"

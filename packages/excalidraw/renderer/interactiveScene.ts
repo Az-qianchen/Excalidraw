@@ -94,6 +94,7 @@ import {
   getTextBoxPadding,
 } from "../textAutoResizeHandle";
 import { MaskEditor, MASK_MIDPOINT_HANDLE_SIZE } from "../mask-editor";
+import type { MagicWandMask, MagicWandContour } from "../mask-editor/magicWand";
 
 import {
   bootstrapCanvas,
@@ -1537,7 +1538,7 @@ const renderMaskEditor = (
     context.clip();
 
     if (maskingMode === "keepOutside") {
-      context.fillStyle = "rgba(255, 0, 0, 0.15)";
+      context.fillStyle = "rgba(56, 132, 244, 0.15)";
       context.fillRect(-width / 2, -height / 2, width, height);
       context.globalCompositeOperation = "destination-out";
       MaskEditor.tracePolygonPath(context, savedLocalPoints);
@@ -1546,7 +1547,7 @@ const renderMaskEditor = (
       context.globalCompositeOperation = "source-over";
     } else {
       MaskEditor.tracePolygonPath(context, savedLocalPoints);
-      context.fillStyle = "rgba(255, 0, 0, 0.15)";
+      context.fillStyle = "rgba(56, 132, 244, 0.15)";
       context.fill();
     }
 
@@ -1597,6 +1598,109 @@ const renderMaskEditor = (
     context.restore();
   } catch (err) {
     console.warn("Mask editor render error:", err);
+  }
+};
+
+// ==================== 魔法抠图覆盖层 ====================
+
+// 模块级临时 canvas 缓存，避免每帧创建新元素
+let _magicWandTmpCanvas: HTMLCanvasElement | null = null;
+
+const renderMagicWandOverlay = (
+  context: CanvasRenderingContext2D,
+  renderConfig: InteractiveCanvasRenderConfig,
+  appState: InteractiveCanvasAppState,
+  magicWandElement: ExcalidrawImageElement,
+  app: AppClassProperties,
+): void => {
+  const { mask, contours } = app.getMagicWandOverlayData();
+  if (!mask || !contours || contours.length === 0) {
+    return;
+  }
+
+  const { zoom } = appState;
+  const cx = magicWandElement.x + magicWandElement.width / 2;
+  const cy = magicWandElement.y + magicWandElement.height / 2;
+  const width = magicWandElement.width;
+  const height = magicWandElement.height;
+
+  try {
+    context.save();
+
+    // 绘制半透明蓝色覆盖层（选区部分）
+    context.save();
+    context.translate(cx, cy);
+    context.rotate(magicWandElement.angle);
+    context.scale(
+      magicWandElement.scale[0] < 0 ? -1 : 1,
+      magicWandElement.scale[1] < 0 ? -1 : 1,
+    );
+
+    // 裁剪到图片范围
+    context.beginPath();
+    context.rect(-width / 2, -height / 2, width, height);
+    context.clip();
+
+    // 使用临时 canvas 将掩码渲染为半透明蓝色覆盖
+    if (
+      !_magicWandTmpCanvas ||
+      _magicWandTmpCanvas.width !== mask.width ||
+      _magicWandTmpCanvas.height !== mask.height
+    ) {
+      _magicWandTmpCanvas = document.createElement("canvas");
+      _magicWandTmpCanvas.width = mask.width;
+      _magicWandTmpCanvas.height = mask.height;
+    }
+    const tmpCtx = _magicWandTmpCanvas.getContext("2d")!;
+    const imgData = tmpCtx.createImageData(mask.width, mask.height);
+    for (let i = 0; i < mask.data.length; i++) {
+      if (mask.data[i]) {
+        const idx = i * 4;
+        imgData.data[idx] = 56;     // R
+        imgData.data[idx + 1] = 132; // G
+        imgData.data[idx + 2] = 244; // B
+        imgData.data[idx + 3] = 38;  // A
+      }
+    }
+    tmpCtx.putImageData(imgData, 0, 0);
+    context.drawImage(_magicWandTmpCanvas, -width / 2, -height / 2, width, height);
+    context.restore();
+
+    // 绘制 marching ants 轮廓虚线
+    context.strokeStyle = renderConfig.selectionColor;
+    context.lineWidth = 1.5 / zoom.value;
+    context.setLineDash([4 / zoom.value, 4 / zoom.value]);
+
+    for (const contour of contours) {
+      if (contour.points.length < 2) {
+        continue;
+      }
+      context.beginPath();
+      const scaleX = width / mask.width;
+      const scaleY = height / mask.height;
+      const flipX = magicWandElement.scale[0] < 0 ? -1 : 1;
+      const flipY = magicWandElement.scale[1] < 0 ? -1 : 1;
+      // 轮廓点在图片像素坐标中，需要转换为全局坐标（含翻转）
+      for (let i = 0; i < contour.points.length; i++) {
+        const px = (contour.points[i].x * scaleX - width / 2) * flipX;
+        const py = (contour.points[i].y * scaleY - height / 2) * flipY;
+        // 应用元素变换
+        const gx = cx + px * Math.cos(magicWandElement.angle) - py * Math.sin(magicWandElement.angle);
+        const gy = cy + px * Math.sin(magicWandElement.angle) + py * Math.cos(magicWandElement.angle);
+        if (i === 0) {
+          context.moveTo(gx, gy);
+        } else {
+          context.lineTo(gx, gy);
+        }
+      }
+      context.closePath();
+      context.stroke();
+    }
+
+    context.setLineDash([]);
+    context.restore();
+  } catch (err) {
+    console.warn("Magic wand overlay render error:", err);
   }
 };
 
@@ -2198,6 +2302,14 @@ const _renderInteractiveScene = ({
 
         if (maskingElement && isImageElement(maskingElement)) {
           renderMaskEditor(context, renderConfig, appState, maskingElement);
+        }
+      }
+
+      if (appState.magicWandElementId) {
+        const magicWandElement = elementsMap.get(appState.magicWandElementId);
+
+        if (magicWandElement && isImageElement(magicWandElement)) {
+          renderMagicWandOverlay(context, renderConfig, appState, magicWandElement, app);
         }
       }
 

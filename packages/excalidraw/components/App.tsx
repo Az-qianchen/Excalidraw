@@ -452,8 +452,23 @@ import { StaticCanvas, InteractiveCanvas } from "./canvases";
 import NewElementCanvas from "./canvases/NewElementCanvas";
 import { isPointHittingLink } from "./hyperlink/helpers";
 import { MaskEditor } from "../mask-editor";
+import {
+  floodFillMask,
+  applyMaskToImage,
+  invertMask,
+  traceMaskContours,
+} from "../mask-editor/magicWand";
+import type { MagicWandMask, MagicWandContour } from "../mask-editor/magicWand";
 import { ToolButton } from "./ToolButton";
-import { MagicIcon, copyIcon, fullscreenIcon, maskToggleIcon } from "./icons";
+import {
+  MagicIcon,
+  copyIcon,
+  fullscreenIcon,
+  maskToggleIcon,
+  checkIcon,
+  LinkIcon,
+  magicWandCloseIcon,
+} from "./icons";
 import { AppStateObserver, type OnStateChange } from "./AppStateObserver";
 
 import { findShapeByKey } from "./shapes";
@@ -669,6 +684,14 @@ class App extends React.Component<AppProps, AppState> {
    * 只从这里恢复遮罩点，避免尚未应用的临时点位进入全局历史记录。
    */
   private maskPointHistory: GlobalPoint[][] = [];
+
+  /** 魔法抠图图像数据缓存 */
+  private magicWandImageData: ImageData | null = null;
+  private magicWandCurrentMask: MagicWandMask | null = null;
+  /** 最终显示用的掩码（含反选处理）及轮廓缓存 */
+  private magicWandDisplayMask: MagicWandMask | null = null;
+  private magicWandDisplayContours: MagicWandContour[] | null = null;
+  private magicWandLastClickPos: { x: number; y: number } | null = null;
 
   private _initialized = false;
 
@@ -2345,19 +2368,10 @@ class App extends React.Component<AppProps, AppState> {
                               const btnY = viewportY - this.state.offsetTop;
                               return (
                                 <div
+                                  className="excalidraw-canvas-buttons"
                                   style={{
-                                    position: "absolute",
                                     top: `${btnY}px`,
                                     left: `${btnX}px`,
-                                    zIndex: "var(--zIndex-canvasButtons)",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "0.25rem",
-                                    background: "var(--island-bg-color)",
-                                    borderRadius: "var(--border-radius-lg)",
-                                    boxShadow:
-                                      "0px 2px 4px 0 rgb(0 0 0 / 30%)",
-                                    padding: "4px",
                                   }}
                                 >
                                   <ToolButton
@@ -2424,6 +2438,109 @@ class App extends React.Component<AppProps, AppState> {
                                       </svg>
                                     }
                                     onClick={this.finishMasking}
+                                  />
+                                </div>
+                              );
+                            })()}
+
+                          {/* 魔法抠图工具栏 */}
+                          {this.state.magicWandElementId &&
+                            (() => {
+                              const mwElement = this.scene.getElement(
+                                this.state.magicWandElementId,
+                              );
+                              if (!mwElement) {
+                                return null;
+                              }
+                              const [x1, y1] = getElementAbsoluteCoords(
+                                mwElement,
+                                elementsMap,
+                              );
+                              const { x: viewportX, y: viewportY } =
+                                sceneCoordsToViewportCoords(
+                                  {
+                                    sceneX: x1 + mwElement.width,
+                                    sceneY: y1,
+                                  },
+                                  this.state,
+                                );
+                              const btnX =
+                                viewportX - this.state.offsetLeft + 10;
+                              const btnY = viewportY - this.state.offsetTop;
+                              return (
+                                <div
+                                  className="excalidraw-canvas-buttons"
+                                  style={{
+                                    top: `${btnY}px`,
+                                    left: `${btnX}px`,
+                                  }}
+                                >
+                                  {this.renderMagicWandNumberInput(
+                                    t("helpDialog.magicWandThreshold"),
+                                    this.state.magicWandThreshold,
+                                    0,
+                                    100,
+                                    (v) => {
+                                      this.setState({ magicWandThreshold: v });
+                                      this.scene.triggerUpdate();
+                                    },
+                                  )}
+                                  {this.renderMagicWandNumberInput(
+                                    t("helpDialog.magicWandFeather"),
+                                    this.state.magicWandFeatherRadius,
+                                    0,
+                                    50,
+                                    (v) => {
+                                      this.setState({ magicWandFeatherRadius: v });
+                                    },
+                                  )}
+                                  <ToolButton
+                                    type="button"
+                                    title={
+                                      this.state.magicWandInverted
+                                        ? t("helpDialog.magicWandKeepOutside")
+                                        : t("helpDialog.magicWandKeepInside")
+                                    }
+                                    aria-label={
+                                      this.state.magicWandInverted
+                                        ? t("helpDialog.magicWandKeepOutside")
+                                        : t("helpDialog.magicWandKeepInside")
+                                    }
+                                    selected={this.state.magicWandInverted}
+                                    icon={maskToggleIcon}
+                                    onClick={() => {
+                                      this.setState({
+                                        magicWandInverted: !this.state.magicWandInverted,
+                                      });
+                                      this.scene.triggerUpdate();
+                                    }}
+                                  />
+                                  <ToolButton
+                                    type="button"
+                                    title={t("helpDialog.magicWandContiguous")}
+                                    aria-label={t("helpDialog.magicWandContiguous")}
+                                    selected={this.state.magicWandContiguous}
+                                    icon={LinkIcon}
+                                    onClick={() => {
+                                      this.setState({
+                                        magicWandContiguous: !this.state.magicWandContiguous,
+                                      });
+                                      this.scene.triggerUpdate();
+                                    }}
+                                  />
+                                  <ToolButton
+                                    type="button"
+                                    title={t("helpDialog.magicWandFinish")}
+                                    aria-label={t("helpDialog.magicWandFinish")}
+                                    icon={checkIcon}
+                                    onClick={this.applyMagicWand}
+                                  />
+                                  <ToolButton
+                                    type="button"
+                                    title={t("helpDialog.magicWandCancel")}
+                                    aria-label={t("helpDialog.magicWandCancel")}
+                                    icon={magicWandCloseIcon}
+                                    onClick={this.cancelMagicWand}
                                   />
                                 </div>
                               );
@@ -3515,6 +3632,53 @@ class App extends React.Component<AppProps, AppState> {
       this.state.maskingElementId
     ) {
       this.maskPointHistory = [];
+    }
+
+    // 进入魔法抠图模式时加载图像数据
+    if (
+      !prevState.magicWandElementId &&
+      this.state.magicWandElementId
+    ) {
+      this.loadMagicWandImageData();
+    }
+
+    // 退出魔法抠图模式时清理缓存
+    if (
+      prevState.magicWandElementId &&
+      !this.state.magicWandElementId
+    ) {
+      this.magicWandImageData = null;
+      this.magicWandCurrentMask = null;
+      this.magicWandDisplayMask = null;
+      this.magicWandDisplayContours = null;
+      this.magicWandLastClickPos = null;
+    }
+
+    // 容差 / 连续 / 反选变化时实时重新计算选区
+    if (
+      this.state.magicWandElementId &&
+      this.magicWandLastClickPos &&
+      this.magicWandImageData &&
+      (prevState.magicWandThreshold !== this.state.magicWandThreshold ||
+        prevState.magicWandContiguous !== this.state.magicWandContiguous)
+    ) {
+      const { x, y } = this.magicWandLastClickPos;
+      const mask = floodFillMask(
+        this.magicWandImageData,
+        x,
+        y,
+        this.state.magicWandThreshold,
+        this.state.magicWandContiguous,
+      );
+
+      this.magicWandCurrentMask = mask;
+      this.updateMagicWandDisplayCache();
+    } else if (
+      this.state.magicWandElementId &&
+      prevState.magicWandInverted !== this.state.magicWandInverted
+    ) {
+      // 仅反选状态变化时，只需更新显示缓存（不重新 flood fill）
+      this.updateMagicWandDisplayCache();
     }
 
     // must be updated *before* state change listeners are triggered below
@@ -4953,6 +5117,18 @@ class App extends React.Component<AppProps, AppState> {
           }
         }
 
+        // 魔法抠图模式键盘事件
+        if (this.state.magicWandElementId) {
+          if (event.key === KEYS.ESCAPE) {
+            this.cancelMagicWand();
+            return;
+          }
+          if (event.key === KEYS.ENTER) {
+            this.applyMagicWand();
+            return;
+          }
+        }
+
         const selectedElements = getSelectedElements(
           this.scene.getNonDeletedElementsMap(),
           this.state,
@@ -5716,6 +5892,11 @@ class App extends React.Component<AppProps, AppState> {
     // 切换工具时退出遮罩编辑模式
     if (this.state.maskingElementId) {
       this.finishMasking();
+    }
+
+    // 切换工具时退出魔法抠图模式
+    if (this.state.magicWandElementId) {
+      this.cancelMagicWand();
     }
 
     const nextActiveTool = updateActiveTool(this.state, tool);
@@ -6633,6 +6814,257 @@ class App extends React.Component<AppProps, AppState> {
 
     this.isApplyingMask = false;
     this.finishMasking();
+  };
+
+  // ========================= 魔法抠图方法 =========================
+
+  private renderMagicWandNumberInput = (
+    label: string,
+    value: number,
+    min: number,
+    max: number,
+    onChange: (v: number) => void,
+  ) => (
+    <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "2px 4px" }}>
+      <label style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{label}</label>
+      <input
+        type="text"
+        className="stroke-width-input"
+        value={value}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === "" || /^\d*$/.test(v)) {
+            onChange(v === "" ? 0 : Math.min(max, Math.max(min, parseInt(v, 10))));
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            onChange(Math.min(max, value + 1));
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            onChange(Math.max(min, value - 1));
+          }
+        }}
+        onWheel={(e) => {
+          onChange(Math.min(max, Math.max(min, value + (e.deltaY > 0 ? -1 : 1))));
+        }}
+        autoComplete="off"
+        spellCheck={false}
+      />
+    </div>
+  );
+
+  /** 加载当前图片的像素数据到缓存 */
+  private loadMagicWandImageData = () => {
+    const { magicWandElementId } = this.state;
+    if (!magicWandElementId) return;
+
+    const element = this.scene.getElement(magicWandElementId);
+    if (!element || !isImageElement(element) || !element.fileId) return;
+
+    const fileData = this.files[element.fileId];
+    if (!fileData) return;
+
+    const img = new Image();
+    img.onload = () => {
+      if (!this.state.magicWandElementId) return;
+
+      const crop = element.crop;
+      const srcW = crop ? crop.width : img.naturalWidth;
+      const srcH = crop ? crop.height : img.naturalHeight;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = srcW;
+      canvas.height = srcH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const srcX = crop ? crop.x : 0;
+      const srcY = crop ? crop.y : 0;
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+      this.magicWandImageData = ctx.getImageData(0, 0, srcW, srcH);
+      this.scene.triggerUpdate();
+    };
+    img.onerror = () => {
+      console.error("Magic wand: failed to load image");
+      this.cancelMagicWand();
+    };
+    img.src = fileData.dataURL;
+  };
+
+  /** 魔法抠图指针点击处理 */
+  private handleMagicWandPointerDown = (
+    event: React.PointerEvent<HTMLElement>,
+  ) => {
+    const { magicWandElementId, magicWandThreshold, magicWandContiguous } = this.state;
+    if (!magicWandElementId || !this.magicWandImageData) return;
+
+    const element = this.scene.getElement(magicWandElementId);
+    if (!element || !isImageElement(element)) return;
+
+    const scenePointer = viewportCoordsToSceneCoords(event, this.state);
+    const globalPoint = pointFrom<GlobalPoint>(
+      scenePointer.x,
+      scenePointer.y,
+    );
+
+    const imgLocal = MaskEditor.globalToImageLocal(
+      globalPoint,
+      element,
+      this.magicWandImageData.width,
+      this.magicWandImageData.height,
+    );
+
+    const crop = element.crop;
+    const pixelX = Math.floor(imgLocal.x - (crop ? crop.x : 0));
+    const pixelY = Math.floor(imgLocal.y - (crop ? crop.y : 0));
+
+    // 缓存点击位置，供容差变化时重新计算选区
+    this.magicWandLastClickPos = { x: pixelX, y: pixelY };
+
+    const mask = floodFillMask(
+      this.magicWandImageData,
+      pixelX,
+      pixelY,
+      magicWandThreshold,
+      magicWandContiguous,
+    );
+
+    this.magicWandCurrentMask = mask;
+    this.updateMagicWandDisplayCache();
+
+    this.scene.triggerUpdate();
+  };
+
+  /** 应用魔法抠图：将选区像素设为透明 */
+  private isApplyingMagicWand = false;
+
+  private applyMagicWand = async () => {
+    if (this.isApplyingMagicWand) return;
+    this.isApplyingMagicWand = true;
+
+    const { magicWandElementId, magicWandFeatherRadius, magicWandInverted } =
+      this.state;
+
+    if (!magicWandElementId || !this.magicWandImageData || !this.magicWandCurrentMask) {
+      this.cancelMagicWand();
+      return;
+    }
+
+    const element = this.scene.getElement(magicWandElementId);
+    if (!element || !isImageElement(element) || !element.fileId) {
+      this.cancelMagicWand();
+      return;
+    }
+
+    try {
+      // 根据反选设置调整掩码
+      let finalMask: MagicWandMask | null = this.magicWandCurrentMask;
+      if (!finalMask) {
+        this.cancelMagicWand();
+        return;
+      }
+      if (magicWandInverted) {
+        const inverted = invertMask(finalMask);
+        if (inverted) {
+          finalMask = inverted;
+        }
+      }
+
+      const { image: resultImageData } = applyMaskToImage(
+        this.magicWandImageData,
+        finalMask,
+        magicWandFeatherRadius,
+      );
+
+      // 将结果绘制到 canvas 并导出 dataURL
+      const canvas = document.createElement("canvas");
+      canvas.width = resultImageData.width;
+      canvas.height = resultImageData.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        this.cancelMagicWand();
+        return;
+      }
+      ctx.putImageData(resultImageData, 0, 0);
+      const dataURL = canvas.toDataURL("image/png");
+
+      flushSync(() => {
+        this.cancelMagicWand();
+      });
+
+      const newFileId =
+        nanoid() as import("@excalidraw/element/types").FileId;
+
+      const newFileData: BinaryFileData = {
+        id: newFileId,
+        dataURL: dataURL as unknown as import("../types").DataURL,
+        mimeType: "image/png" as const,
+        created: Date.now(),
+      };
+
+      this.addMissingFiles([newFileData]);
+
+      this.scene.mutateElement(element, {
+        fileId: newFileId,
+        crop: null,
+      });
+      this.store.scheduleCapture();
+
+      this.clearImageShapeCache({ [newFileId]: newFileData } as BinaryFiles);
+      this.scene.triggerUpdate();
+      this.addNewImagesToImageCache();
+    } catch (err) {
+      console.error("Failed to apply magic wand:", err);
+    } finally {
+      this.isApplyingMagicWand = false;
+    }
+  };
+
+  /** 取消魔法抠图 */
+  private cancelMagicWand = () => {
+    if (this.state.magicWandElementId) {
+      this.store.scheduleAction(CaptureUpdateAction.NEVER);
+      this.setState({
+        magicWandElementId: null,
+        magicWandThreshold: 20,
+        magicWandFeatherRadius: 0,
+        magicWandInverted: false,
+        magicWandContiguous: true,
+      });
+    }
+    this.magicWandImageData = null;
+    this.magicWandCurrentMask = null;
+    this.magicWandDisplayMask = null;
+    this.magicWandDisplayContours = null;
+    this.magicWandLastClickPos = null;
+  };
+
+  /**
+   * 根据当前 mask 和反选状态，更新显示用的掩码与轮廓缓存。
+   * 仅在数据实际变化时调用，避免渲染帧重复计算。
+   */
+  private updateMagicWandDisplayCache = () => {
+    let mask = this.magicWandCurrentMask;
+    if (mask && this.state.magicWandInverted) {
+      mask = invertMask(mask);
+    }
+    if (mask) {
+      this.magicWandDisplayMask = mask;
+      this.magicWandDisplayContours = traceMaskContours(mask);
+    } else {
+      this.magicWandDisplayMask = null;
+      this.magicWandDisplayContours = null;
+    }
+  };
+
+  /** 获取魔法抠图覆盖层渲染数据（供 renderer 使用，直接返回缓存） */
+  public getMagicWandOverlayData = () => {
+    return {
+      mask: this.magicWandDisplayMask,
+      contours: this.magicWandDisplayContours,
+    };
   };
 
   private shouldHandleBrowserCanvasDoubleClick = (type: string) => {
@@ -8021,6 +8453,20 @@ class App extends React.Component<AppProps, AppState> {
         if (hitForMask?.id !== this.state.maskingElementId) {
           return;
         }
+      }
+    }
+
+    // 魔法抠图模式下，点击图片执行选区操作
+    if (this.state.magicWandElementId) {
+      if (
+        event.button === POINTER_BUTTON.WHEEL ||
+        isHoldingSpace ||
+        isHandToolActive(this.state)
+      ) {
+        // 允许通过，不做拦截
+      } else {
+        this.handleMagicWandPointerDown(event);
+        return;
       }
     }
 

@@ -874,6 +874,9 @@ export class AppStateDelta implements DeltaContainer<AppState> {
               visibleDifferenceFlag.value = true;
             }
             break;
+          case "magicWandElementId":
+            // 魔法抠图元素 ID 变化不需要触发可见差异
+            break;
           default:
             assertNever(
               key,
@@ -954,6 +957,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
       selectedLinearElement,
       croppingElementId,
       maskingElementId,
+      magicWandElementId,
       lockedMultiSelections,
       activeLockedId,
       ...standaloneProps

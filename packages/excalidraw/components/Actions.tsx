@@ -190,6 +190,9 @@ export const SelectedShapeActions = ({
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
 
+  const showMagicWandAction =
+    showMaskEditorAction && !appState.magicWandElementId;
+
   const showAlignActions =
     !isSingleElementBoundContainer && alignActionsPredicate(appState, app);
 
@@ -316,6 +319,7 @@ export const SelectedShapeActions = ({
             {showAutoCropAction && renderAction("autoCrop")}
             {showCropEditorAction && renderAction("cropEditor")}
             {showMaskEditorAction && renderAction("maskEditor")}
+            {showMagicWandAction && renderAction("magicWand")}
             {showLineEditorAction && renderAction("toggleLinearEditor")}
             <ImageFiltersButton
               targetElements={targetElements}
