@@ -44,6 +44,7 @@
 </cite>
 
 ## 目录
+
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -56,10 +57,13 @@
 10. [附录](#附录)
 
 ## 简介
+
 本文件为 Excalidraw 工具函数库的完整 API 文档，覆盖通用工具函数、数学计算函数与实用工具。内容涵盖坐标转换、几何计算、字符串处理、数组操作、对象与集合、颜色处理、日期时间、DOM 操作、键盘事件、平台检测、URL 处理、数据校验、编码解码、异步控制、函数式编程、序列与迭代器、堆与图算法、搜索与排序、随机数与组合数学、矩阵与向量、统计与插值、数值方法、物理量计算以及常用算法等模块。文档提供每个函数的用途说明、参数与返回类型、使用示例、性能特征、适用场景、边界条件、错误处理与异常情况，并给出函数组合、链式调用与高阶函数的使用模式，以及测试用例与验证方法。
 
 ## 项目结构
+
 该仓库采用 monorepo 结构，工具函数主要分布在 packages 目录下，其中：
+
 - packages/common：通用常量与基础类型定义
 - packages/element：元素模型与相关工具
 - packages/excalidraw：编辑器核心功能（含 actions 与 charts）
@@ -108,6 +112,7 @@ Utils --> TestUtils["test-utils.ts<br/>测试工具"]
 ```
 
 图表来源
+
 - [package.json:1-96](file://package.json#L1-L96)
 - [packages/common/src/index.ts](file://packages/common/src/index.ts)
 - [packages/element/src/index.ts](file://packages/element/src/index.ts)
@@ -117,11 +122,14 @@ Utils --> TestUtils["test-utils.ts<br/>测试工具"]
 - [packages/utils/src/index.ts](file://packages/utils/src/index.ts)
 
 章节来源
+
 - [package.json:1-96](file://package.json#L1-L96)
 - [README.md:1-125](file://README.md#L1-L125)
 
 ## 核心组件
+
 本节概述工具函数库的核心模块及其职责：
+
 - 数组与集合：提供数组去重、合并、分组、扁平化、差集、交集、并集等操作，支持链式调用与高阶函数组合。
 - 几何与坐标：提供点线面关系判断、距离计算、角度换算、坐标变换、多边形面积与重心、碰撞检测等。
 - 字符串处理：提供大小写转换、截断、填充、模板替换、正则安全转义、编码转换等。
@@ -148,6 +156,7 @@ Utils --> TestUtils["test-utils.ts<br/>测试工具"]
 - 算法：提供动态规划、贪心、回溯、分支限界、近似算法等。
 
 章节来源
+
 - [packages/utils/src/index.ts](file://packages/utils/src/index.ts)
 - [packages/utils/src/array.ts](file://packages/utils/src/array.ts)
 - [packages/utils/src/geometry.ts](file://packages/utils/src/geometry.ts)
@@ -181,7 +190,9 @@ Utils --> TestUtils["test-utils.ts<br/>测试工具"]
 - [packages/utils/src/algorithm.ts](file://packages/utils/src/algorithm.ts)
 
 ## 架构总览
+
 工具函数库采用模块化设计，按功能域划分文件，每个文件聚焦一类工具能力。模块之间通过导出/导入形成清晰的依赖关系，避免循环依赖。核心设计原则：
+
 - 单一职责：每个模块只负责一类工具能力
 - 无副作用：尽量提供纯函数，必要时通过配置参数控制行为
 - 可组合：函数间可自由组合，支持链式调用与高阶函数
@@ -258,6 +269,7 @@ U --> TU
 ```
 
 图表来源
+
 - [packages/utils/src/index.ts](file://packages/utils/src/index.ts)
 - [packages/utils/src/array.ts](file://packages/utils/src/array.ts)
 - [packages/utils/src/geometry.ts](file://packages/utils/src/geometry.ts)
@@ -294,6 +306,7 @@ U --> TU
 ## 详细组件分析
 
 ### 数组工具（array.ts）
+
 - 功能概述：提供数组去重、合并、分组、扁平化、差集、交集、并集、排列组合、轮询、裁剪等操作；支持链式调用与高阶函数组合。
 - 关键函数与用途：
   - 去重：移除重复元素，支持自定义判等函数
@@ -314,10 +327,12 @@ U --> TU
 - 高阶函数：支持传入比较函数、映射函数、过滤函数
 
 章节来源
+
 - [packages/utils/src/array.ts](file://packages/utils/src/array.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 几何与坐标（geometry.ts）
+
 - 功能概述：提供点线面关系判断、距离计算、角度换算、坐标变换、多边形面积与重心、碰撞检测、包围盒计算等。
 - 关键函数与用途：
   - 距离：欧氏距离、曼哈顿距离、切比雪夫距离
@@ -336,10 +351,12 @@ U --> TU
 - 高阶函数：支持传入变换矩阵、比较函数
 
 章节来源
+
 - [packages/utils/src/geometry.ts](file://packages/utils/src/geometry.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 字符串处理（string.ts）
+
 - 功能概述：提供大小写转换、截断、填充、模板替换、正则安全转义、编码转换、语言检测等。
 - 关键函数与用途：
   - 大小写：标题化、驼峰化、下划线化
@@ -358,10 +375,12 @@ U --> TU
 - 高阶函数：支持自定义转换规则
 
 章节来源
+
 - [packages/utils/src/string.ts](file://packages/utils/src/string.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 对象与映射（object.ts）
+
 - 功能概述：提供深拷贝、浅拷贝、属性访问与设置、默认值合并、键值映射、对象比较、冻结与密封等。
 - 关键函数与用途：
   - 拷贝：深拷贝、浅拷贝、部分拷贝
@@ -381,10 +400,12 @@ U --> TU
 - 高阶函数：支持自定义比较器、映射函数
 
 章节来源
+
 - [packages/utils/src/object.ts](file://packages/utils/src/object.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 颜色处理（color.ts）
+
 - 功能概述：提供 RGB/HSL/HSV/HEX/CMYK 等颜色空间互转、透明度处理、颜色混合与对比度计算。
 - 关键函数与用途：
   - 转换：RGB↔HSL、RGB↔HSV、RGB↔HEX、RGB↔CMYK
@@ -401,10 +422,12 @@ U --> TU
 - 高阶函数：支持自定义混合模式
 
 章节来源
+
 - [packages/utils/src/color.ts](file://packages/utils/src/color.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 数字与精度（number.ts）
+
 - 功能概述：提供舍入策略、范围裁剪、百分比计算、小数精度修正、进制转换、随机数生成等。
 - 关键函数与用途：
   - 舍入：四舍五入、向下取整、向上取整、银行家舍入
@@ -423,10 +446,12 @@ U --> TU
 - 高阶函数：支持自定义舍入策略
 
 章节来源
+
 - [packages/utils/src/number.ts](file://packages/utils/src/number.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 日期与时间（date.ts）
+
 - 功能概述：提供格式化、时区转换、相对时间、时间差计算、日历工具、工作日计算等。
 - 关键函数与用途：
   - 格式化：ISO、本地化、自定义格式
@@ -445,10 +470,12 @@ U --> TU
 - 高阶函数：支持自定义格式器
 
 章节来源
+
 - [packages/utils/src/date.ts](file://packages/utils/src/date.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### DOM 操作（dom.ts）
+
 - 功能概述：提供元素查询、样式读取与设置、事件绑定、滚动定位、尺寸测量、焦点管理等。
 - 关键函数与用途：
   - 查询：选择器、上下文查询、批量查询
@@ -467,10 +494,12 @@ U --> TU
 - 高阶函数：支持事件处理器、样式工厂
 
 章节来源
+
 - [packages/utils/src/dom.ts](file://packages/utils/src/dom.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 键盘与输入（keyboard.ts）
+
 - 功能概述：提供按键码映射、修饰键检测、输入法状态、快捷键组合识别、键盘布局检测等。
 - 关键函数与用途：
   - 按键：键码映射、按键名称、组合键
@@ -488,10 +517,12 @@ U --> TU
 - 高阶函数：支持自定义快捷键规则
 
 章节来源
+
 - [packages/utils/src/keyboard.ts](file://packages/utils/src/keyboard.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 平台与环境（platform.ts）
+
 - 功能概述：提供浏览器/操作系统/设备类型检测、UA 解析、特性检测、屏幕信息、网络状态等。
 - 关键函数与用途：
   - 检测：浏览器类型、操作系统、设备类型
@@ -509,10 +540,12 @@ U --> TU
 - 高阶函数：支持自定义检测规则
 
 章节来源
+
 - [packages/utils/src/platform.ts](file://packages/utils/src/platform.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### URL 与路由（url.ts）
+
 - 功能概述：提供查询参数解析与构建、路径拼接、协议与域名提取、相对路径解析、路由匹配等。
 - 关键函数与用途：
   - 解析：查询参数、片段、主机、端口
@@ -529,10 +562,12 @@ U --> TU
 - 高阶函数：支持自定义解析器
 
 章节来源
+
 - [packages/utils/src/url.ts](file://packages/utils/src/url.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 数据校验（validation.ts）
+
 - 功能概述：提供类型校验、格式校验、长度限制、范围约束、正则匹配、自定义校验器等。
 - 关键函数与用途：
   - 类型：基本类型、对象、数组、函数
@@ -551,10 +586,12 @@ U --> TU
 - 高阶函数：支持自定义校验器
 
 章节来源
+
 - [packages/utils/src/validation.ts](file://packages/utils/src/validation.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 编码与解码（encoding.ts）
+
 - 功能概述：提供 Base64、URL 编码、十六进制、UTF-8/UTF-16 转换、二进制与文本互转等。
 - 关键函数与用途：
   - Base64：标准与 URL 安全变体
@@ -572,10 +609,12 @@ U --> TU
 - 高阶函数：支持自定义编码器
 
 章节来源
+
 - [packages/utils/src/encoding.ts](file://packages/utils/src/encoding.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 异步控制（async.ts）
+
 - 功能概述：提供防抖、节流、超时、并发控制、Promise 包装、取消令牌、重试机制等。
 - 关键函数与用途：
   - 防抖：延迟执行、立即执行、取消
@@ -593,10 +632,12 @@ U --> TU
 - 高阶函数：支持自定义策略
 
 章节来源
+
 - [packages/utils/src/async.ts](file://packages/utils/src/async.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 函数式编程（functional.ts）
+
 - 功能概述：提供柯里化、组合、管道、记忆化、惰性求值、偏应用、函数装饰器等。
 - 关键函数与用途：
   - 柯里化：将多参函数转为单参链式
@@ -616,10 +657,12 @@ U --> TU
 - 高阶函数：支持自定义装饰器
 
 章节来源
+
 - [packages/utils/src/functional.ts](file://packages/utils/src/functional.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 序列与迭代器（sequence.ts）
+
 - 功能概述：提供生成器、惰性序列、滑动窗口、交错合并、无限序列、斐波那契、素数等。
 - 关键函数与用途：
   - 生成器：斐波那契、素数、阶乘、幂序列
@@ -636,10 +679,12 @@ U --> TU
 - 高阶函数：支持自定义生成规则
 
 章节来源
+
 - [packages/utils/src/sequence.ts](file://packages/utils/src/sequence.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 迭代器（iterator.ts）
+
 - 功能概述：提供迭代器工厂、适配器、转换器、过滤器、映射器、归并器等。
 - 关键函数与用途：
   - 工厂：数组/对象/生成器迭代器
@@ -656,10 +701,12 @@ U --> TU
 - 高阶函数：支持自定义适配器
 
 章节来源
+
 - [packages/utils/src/iterator.ts](file://packages/utils/src/iterator.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 堆与优先队列（heap.ts）
+
 - 功能概述：提供二叉堆、最大堆/最小堆、优先队列、Top-K、中位数维护等。
 - 关键函数与用途：
   - 堆：插入、删除、堆化、堆顶访问
@@ -676,15 +723,17 @@ U --> TU
 - 高阶函数：支持自定义比较器
 
 章节来源
+
 - [packages/utils/src/heap.ts](file://packages/utils/src/heap.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 图算法（graph.ts）
+
 - 功能概述：提供邻接表/邻接矩阵表示、遍历（DFS/BFS）、最短路径（Dijkstra/Floyd）、拓扑排序、连通性检测、环检测等。
 - 关键函数与用途：
   - 表示：邻接表、邻接矩阵、边列表
   - 遍历：深度优先、广度优先、路径记录
-  - 最短路：Dijkstra、Floyd-Warshall、A*
+  - 最短路：Dijkstra、Floyd-Warshall、A\*
   - 拓扑：拓扑排序、环检测
   - 连通：强连通、弱连通、桥与割点
 - 参数与返回类型：图对象、路径数组、布尔值
@@ -697,10 +746,12 @@ U --> TU
 - 高阶函数：支持自定义权重与启发式
 
 章节来源
+
 - [packages/utils/src/graph.ts](file://packages/utils/src/graph.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 搜索与排序（search.ts / sort.ts）
+
 - 功能概述：提供二分查找、插值查找、快速排序、归并排序、堆排序、计数排序、基数排序等。
 - 关键函数与用途：
   - 搜索：二分、插值、指数、跳跃
@@ -716,11 +767,13 @@ U --> TU
 - 高阶函数：支持自定义比较器
 
 章节来源
+
 - [packages/utils/src/search.ts](file://packages/utils/src/search.ts)
 - [packages/utils/src/sort.ts](file://packages/utils/src/sort.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 随机与组合（random.ts / combinatorics.ts）
+
 - 功能概述：提供均匀分布、正态分布、指数分布、置换、排列、组合、抽样、洗牌等。
 - 关键函数与用途：
   - 分布：均匀、正态、指数、贝塔
@@ -737,11 +790,13 @@ U --> TU
 - 高阶函数：支持自定义分布
 
 章节来源
+
 - [packages/utils/src/random.ts](file://packages/utils/src/random.ts)
 - [packages/utils/src/combinatorics.ts](file://packages/utils/src/combinatorics.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 矩阵与向量（matrix.ts / vector.ts）
+
 - 功能概述：提供矩阵加减乘除、转置、行列式、逆矩阵、LU 分解、QR 分解、特征值分解等；向量点积、叉积、投影、归一化等。
 - 关键函数与用途：
   - 矩阵：加减乘除、转置、求逆、分解
@@ -757,11 +812,13 @@ U --> TU
 - 高阶函数：支持自定义分解算法
 
 章节来源
+
 - [packages/utils/src/matrix.ts](file://packages/utils/src/matrix.ts)
 - [packages/utils/src/vector.ts](file://packages/utils/src/vector.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 统计与插值（statistics.ts / interpolation.ts）
+
 - 功能概述：提供均值、方差、标准差、分位数、回归（线性/多项式/样条）、插值（线性/二次/三次样条、贝塞尔）等。
 - 关键函数与用途：
   - 统计：均值、方差、协方差、相关系数
@@ -777,11 +834,13 @@ U --> TU
 - 高阶函数：支持自定义损失函数
 
 章节来源
+
 - [packages/utils/src/statistics.ts](file://packages/utils/src/statistics.ts)
 - [packages/utils/src/interpolation.ts](file://packages/utils/src/interpolation.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 数值方法（numerical.ts）
+
 - 功能概述：提供数值积分（梯形、辛普森）、数值微分（前向/中心/后向）、零点求解（二分、牛顿、割线）、常微分方程求解（欧拉、RK4）等。
 - 关键函数与用途：
   - 积分：梯形、辛普森、高斯求积
@@ -798,10 +857,12 @@ U --> TU
 - 高阶函数：支持自定义容差
 
 章节来源
+
 - [packages/utils/src/numerical.ts](file://packages/utils/src/numerical.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 物理量（physics.ts）
+
 - 功能概述：提供单位换算（长度、质量、时间、温度、电流、物质的量、发光强度）、速度/加速度、力/功/能、光速、重力常数等。
 - 关键函数与用途：
   - 换算：米/千米、克/千克、摄氏/开尔文、焦耳/卡路里
@@ -817,10 +878,12 @@ U --> TU
 - 高阶函数：支持自定义常数
 
 章节来源
+
 - [packages/utils/src/physics.ts](file://packages/utils/src/physics.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ### 算法（algorithm.ts）
+
 - 功能概述：提供动态规划（最长公共子序列、背包问题、编辑距离）、贪心（活动选择、霍夫曼编码）、回溯（N 皇后、数独）、分支限界（旅行商）等。
 - 关键函数与用途：
   - 动态规划：LCS、0/1 背包、编辑距离
@@ -837,10 +900,12 @@ U --> TU
 - 高阶函数：支持自定义状态转移
 
 章节来源
+
 - [packages/utils/src/algorithm.ts](file://packages/utils/src/algorithm.ts)
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ## 依赖分析
+
 工具函数库内部模块之间存在清晰的依赖关系，统一由入口文件导出。外部依赖主要来自 TypeScript 类型与运行时环境（浏览器/Node），无第三方运行时依赖。模块间耦合度低，便于单独使用与测试。
 
 ```mermaid
@@ -879,6 +944,7 @@ U --> TU["test-utils.ts"]
 ```
 
 图表来源
+
 - [packages/utils/src/index.ts](file://packages/utils/src/index.ts)
 - [packages/utils/src/array.ts](file://packages/utils/src/array.ts)
 - [packages/utils/src/geometry.ts](file://packages/utils/src/geometry.ts)
@@ -913,10 +979,12 @@ U --> TU["test-utils.ts"]
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 章节来源
+
 - [packages/utils/src/index.ts](file://packages/utils/src/index.ts)
 
 ## 性能考虑
-- 时间复杂度：优先选择最优算法，如排序使用快排/归并，搜索使用二分，图算法使用 Dijkstra/A*。
+
+- 时间复杂度：优先选择最优算法，如排序使用快排/归并，搜索使用二分，图算法使用 Dijkstra/A\*。
 - 空间复杂度：利用惰性求值与生成器减少内存占用，使用缓存与记忆化提升重复调用性能。
 - 浮点误差：在数值计算中注意舍入策略与误差累积，必要时使用高精度库。
 - 并发与异步：合理使用防抖/节流与并发控制，避免主线程阻塞。
@@ -924,6 +992,7 @@ U --> TU["test-utils.ts"]
 - I/O 与网络：批量处理与缓存，减少往返次数。
 
 ## 故障排除指南
+
 - 类型错误：确保传入参数类型正确，必要时使用校验函数。
 - 边界条件：处理空数组、空对象、零值、负值等特殊情况。
 - 性能问题：分析算法复杂度，使用缓存与优化策略。
@@ -931,12 +1000,15 @@ U --> TU["test-utils.ts"]
 - 测试验证：使用单元测试与集成测试覆盖关键路径与边界条件。
 
 章节来源
+
 - [packages/utils/src/test-utils.ts](file://packages/utils/src/test-utils.ts)
 
 ## 结论
+
 本工具函数库提供了全面、高性能、可组合的通用工具集，覆盖从基础数据结构到高级算法的广泛领域。通过模块化设计与严格的类型约束，开发者可以灵活组合使用，快速构建高质量的应用程序。建议在生产环境中结合测试用例与性能监控，持续优化与演进。
 
 ## 附录
+
 - 测试用例与验证方法：参考各模块的测试文件与示例，确保函数在各种边界条件下稳定运行。
 - 使用示例：参考示例项目与文档，了解典型应用场景与最佳实践。
 - 版本与兼容性：关注版本变更与废弃 API，及时迁移以保证兼容性。

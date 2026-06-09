@@ -15,6 +15,7 @@
 </cite>
 
 ## 目录
+
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -27,9 +28,11 @@
 10. [附录：最佳实践与扩展建议](#附录最佳实践与扩展建议)
 
 ## 简介
+
 本文件面向希望深入理解并扩展 Excalidraw React 组件系统的开发者，系统性梳理应用层主组件与子组件的架构设计原则、组件层次结构、组件间通信机制（含状态提升、事件处理、跨模块共享状态）、生命周期管理、性能优化策略与内存管理，并给出可复用 UI 组件的实现建议与扩展实践。
 
 ## 项目结构
+
 应用入口通过根节点渲染主应用组件，主应用组件负责初始化场景、加载数据、绑定协作与本地存储、处理导出与调试等职责；同时，应用层封装了菜单、侧边栏、欢迎页、错误边界等子组件，形成清晰的分层结构。
 
 ```mermaid
@@ -44,6 +47,7 @@ App --> Jotai["状态容器<br/>app-jotai.ts"]
 ```
 
 图表来源
+
 - [excalidraw-app/index.tsx:1-18](file://excalidraw-app/index.tsx#L1-L18)
 - [excalidraw-app/App.tsx:1-1288](file://excalidraw-app/App.tsx#L1-L1288)
 - [excalidraw-app/components/AppMainMenu.tsx:1-93](file://excalidraw-app/components/AppMainMenu.tsx#L1-L93)
@@ -54,10 +58,12 @@ App --> Jotai["状态容器<br/>app-jotai.ts"]
 - [excalidraw-app/components/TopErrorBoundary.tsx:1-147](file://excalidraw-app/components/TopErrorBoundary.tsx#L1-L147)
 
 章节来源
+
 - [excalidraw-app/index.tsx:1-18](file://excalidraw-app/index.tsx#L1-L18)
 - [excalidraw-app/App.tsx:1-1288](file://excalidraw-app/App.tsx#L1-L1288)
 
 ## 核心组件
+
 - 主应用组件（App.tsx）：负责初始化场景、监听路由/窗口事件、协调本地存储与协作、处理导出与调试、注入自定义统计组件等。
 - 菜单组件（AppMainMenu.tsx）：基于通用菜单组件封装，提供加载/保存/导出/协作/主题切换/语言选择等能力。
 - 侧边栏组件（AppSidebar.tsx）：基于通用侧边栏组件封装，提供评论与演示相关促销内容。
@@ -67,6 +73,7 @@ App --> Jotai["状态容器<br/>app-jotai.ts"]
 - 错误边界（TopErrorBoundary.tsx）：顶层错误捕获，上报 Sentry 并提供重载与清理本地存储的能力。
 
 章节来源
+
 - [excalidraw-app/components/AppMainMenu.tsx:1-93](file://excalidraw-app/components/AppMainMenu.tsx#L1-L93)
 - [excalidraw-app/components/AppSidebar.tsx:1-80](file://excalidraw-app/components/AppSidebar.tsx#L1-L80)
 - [excalidraw-app/components/AppWelcomeScreen.tsx:1-83](file://excalidraw-app/components/AppWelcomeScreen.tsx#L1-L83)
@@ -75,6 +82,7 @@ App --> Jotai["状态容器<br/>app-jotai.ts"]
 - [excalidraw-app/components/TopErrorBoundary.tsx:1-147](file://excalidraw-app/components/TopErrorBoundary.tsx#L1-L147)
 
 ## 架构总览
+
 下图展示应用层主组件与子组件之间的交互关系，以及与协作服务、状态容器、错误边界的集成方式。
 
 ```mermaid
@@ -103,6 +111,7 @@ C --> J
 ```
 
 图表来源
+
 - [excalidraw-app/App.tsx:1-1288](file://excalidraw-app/App.tsx#L1-L1288)
 - [excalidraw-app/components/AppMainMenu.tsx:1-93](file://excalidraw-app/components/AppMainMenu.tsx#L1-L93)
 - [excalidraw-app/components/AppSidebar.tsx:1-80](file://excalidraw-app/components/AppSidebar.tsx#L1-L80)
@@ -115,6 +124,7 @@ C --> J
 ## 组件详解
 
 ### 主应用组件（App.tsx）
+
 - 设计模式与职责
   - 场景初始化：解析 URL/哈希参数，决定是否从外部后端或本地恢复场景，并在协作模式下与协作服务对接。
   - 数据加载：根据场景类型加载图片文件，支持协作与非协作两种路径。
@@ -158,14 +168,17 @@ App->>API : 可选渲染调试画布
 ```
 
 图表来源
+
 - [excalidraw-app/App.tsx:216-372](file://excalidraw-app/App.tsx#L216-L372)
 - [excalidraw-app/collab/Collab.tsx:471-706](file://excalidraw-app/collab/Collab.tsx#L471-L706)
 - [excalidraw-app/app-jotai.ts:13-38](file://excalidraw-app/app-jotai.ts#L13-L38)
 
 章节来源
+
 - [excalidraw-app/App.tsx:1-1288](file://excalidraw-app/App.tsx#L1-L1288)
 
 ### 菜单组件（AppMainMenu.tsx）
+
 - 设计要点
   - 基于通用菜单组件，提供加载/保存/导出/协作触发/命令面板/搜索/帮助/清空画布等默认项。
   - 支持主题切换、语言列表、社交链接、Plus 入口等扩展项。
@@ -192,12 +205,15 @@ AppMainMenu --> Props : "接收"
 ```
 
 图表来源
+
 - [excalidraw-app/components/AppMainMenu.tsx:18-92](file://excalidraw-app/components/AppMainMenu.tsx#L18-L92)
 
 章节来源
+
 - [excalidraw-app/components/AppMainMenu.tsx:1-93](file://excalidraw-app/components/AppMainMenu.tsx#L1-L93)
 
 ### 侧边栏组件（AppSidebar.tsx）
+
 - 设计要点
   - 基于通用侧边栏组件，提供评论与演示两个标签页。
   - 根据当前主题动态切换促销图片资源。
@@ -216,12 +232,15 @@ AppSidebar --> "Sidebar.Tab" : "组合"
 ```
 
 图表来源
+
 - [excalidraw-app/components/AppSidebar.tsx:11-79](file://excalidraw-app/components/AppSidebar.tsx#L11-L79)
 
 章节来源
+
 - [excalidraw-app/components/AppSidebar.tsx:1-80](file://excalidraw-app/components/AppSidebar.tsx#L1-L80)
 
 ### 欢迎页组件（AppWelcomeScreen.tsx）
+
 - 设计要点
   - 基于通用欢迎页组件，提供菜单提示、工具栏提示、帮助提示与中心区域入口。
   - 中心区域包含加载场景、帮助、协作触发与登录/注册入口。
@@ -243,12 +262,15 @@ AppWelcomeScreen --> Props : "接收"
 ```
 
 图表来源
+
 - [excalidraw-app/components/AppWelcomeScreen.tsx:9-82](file://excalidraw-app/components/AppWelcomeScreen.tsx#L9-L82)
 
 章节来源
+
 - [excalidraw-app/components/AppWelcomeScreen.tsx:1-83](file://excalidraw-app/components/AppWelcomeScreen.tsx#L1-L83)
 
 ### 协作服务（Collab.tsx）
+
 - 设计要点
   - 以类组件封装协作逻辑，包含房间建立、元素同步、光标与视图广播、离线检测、文件管理等。
   - 通过 Portal 与 Socket 通信，使用 AES 解密数据，保证传输安全。
@@ -273,13 +295,16 @@ Stop --> End(["结束"])
 ```
 
 图表来源
+
 - [excalidraw-app/collab/Collab.tsx:471-706](file://excalidraw-app/collab/Collab.tsx#L471-L706)
 - [excalidraw-app/collab/Collab.tsx:357-403](file://excalidraw-app/collab/Collab.tsx#L357-L403)
 
 章节来源
+
 - [excalidraw-app/collab/Collab.tsx:1-1052](file://excalidraw-app/collab/Collab.tsx#L1-L1052)
 
 ### 状态容器（app-jotai.ts）
+
 - 设计要点
   - 基于 jotai 创建全局 store，提供 Provider、useAtom、useAtomValue、useSetAtom 等钩子。
   - 提供 useAtomWithInitialValue，确保在首次渲染时设置初始值，避免副作用。
@@ -311,14 +336,17 @@ Collab --> JotaiStore : "读取/写入状态"
 ```
 
 图表来源
+
 - [excalidraw-app/app-jotai.ts:13-38](file://excalidraw-app/app-jotai.ts#L13-L38)
 - [excalidraw-app/App.tsx:84-90](file://excalidraw-app/App.tsx#L84-L90)
 - [excalidraw-app/collab/Collab.tsx:98-100](file://excalidraw-app/collab/Collab.tsx#L98-L100)
 
 章节来源
+
 - [excalidraw-app/app-jotai.ts:1-38](file://excalidraw-app/app-jotai.ts#L1-L38)
 
 ### 错误边界（TopErrorBoundary.tsx）
+
 - 设计要点
   - 捕获子树异常，上报 Sentry 并生成事件 ID。
   - 提供一键重载与清理本地存储的能力，辅助问题定位与恢复。
@@ -338,13 +366,16 @@ Boundary->>Boundary : 提供重载/清理选项
 ```
 
 图表来源
+
 - [excalidraw-app/components/TopErrorBoundary.tsx:26-46](file://excalidraw-app/components/TopErrorBoundary.tsx#L26-L46)
 - [excalidraw-app/components/TopErrorBoundary.tsx:75-145](file://excalidraw-app/components/TopErrorBoundary.tsx#L75-L145)
 
 章节来源
+
 - [excalidraw-app/components/TopErrorBoundary.tsx:1-147](file://excalidraw-app/components/TopErrorBoundary.tsx#L1-L147)
 
 ## 依赖关系分析
+
 - 应用层对通用包的依赖
   - 主应用组件通过 @excalidraw/excalidraw 导入核心组件与类型，实现与通用编辑器的解耦。
   - 子组件同样依赖通用组件库，保证 UI 一致性与可维护性。
@@ -367,6 +398,7 @@ App --> Jotai
 ```
 
 图表来源
+
 - [packages/excalidraw/package.json:76-117](file://packages/excalidraw/package.json#L76-L117)
 - [excalidraw-app/App.tsx:1-1288](file://excalidraw-app/App.tsx#L1-L1288)
 - [excalidraw-app/components/AppMainMenu.tsx:1-93](file://excalidraw-app/components/AppMainMenu.tsx#L1-L93)
@@ -376,9 +408,11 @@ App --> Jotai
 - [excalidraw-app/app-jotai.ts:1-38](file://excalidraw-app/app-jotai.ts#L1-L38)
 
 章节来源
+
 - [packages/excalidraw/package.json:1-141](file://packages/excalidraw/package.json#L1-L141)
 
 ## 性能与内存管理
+
 - 性能优化
   - 渲染节流：主应用开启渲染节流常量，降低复杂场景下的渲染压力。
   - 防抖与节流：对可见性变化、同步操作进行防抖，对高频事件进行节流。
@@ -390,11 +424,13 @@ App --> Jotai
   - 在挂载时注册事件监听，在卸载时统一移除，防止内存泄漏。
 
 章节来源
+
 - [excalidraw-app/App.tsx:155-676](file://excalidraw-app/App.tsx#L155-L676)
 - [excalidraw-app/collab/Collab.tsx:256-279](file://excalidraw-app/collab/Collab.tsx#L256-L279)
 - [excalidraw-app/collab/Collab.tsx:357-403](file://excalidraw-app/collab/Collab.tsx#L357-L403)
 
 ## 故障排查指南
+
 - 异常捕获与上报
   - 使用顶层错误边界捕获异常，自动上报 Sentry 并提供重载与清理本地存储的入口。
 - 协作异常
@@ -403,14 +439,17 @@ App --> Jotai
   - 导出拦截器在导出前等待图片加载完成，若发生错误则抛出并记录设备信息，便于定位问题。
 
 章节来源
+
 - [excalidraw-app/components/TopErrorBoundary.tsx:1-147](file://excalidraw-app/components/TopErrorBoundary.tsx#L1-L147)
 - [excalidraw-app/collab/Collab.tsx:315-355](file://excalidraw-app/collab/Collab.tsx#L315-L355)
 - [excalidraw-app/App.tsx:734-772](file://excalidraw-app/App.tsx#L734-L772)
 
 ## 结论
+
 该 React 组件系统通过清晰的分层与职责划分，结合状态提升、事件处理与全局状态容器，实现了可扩展、可维护且高性能的编辑器应用。主应用组件承担场景初始化与数据协调，子组件专注于各自 UI 与交互，协作服务独立处理实时通信与状态同步，错误边界保障整体稳定性。开发者可在现有组件基础上，通过 props 传递、回调注入与状态原子扩展新的功能与定制需求。
 
 ## 附录：最佳实践与扩展建议
+
 - 组件设计
   - 使用受控组件：将可编辑属性通过 props 传入，由父组件统一管理状态，子组件只负责渲染与回调触发。
   - 使用非受控组件：对于临时状态或一次性输入，使用 ref 或内部状态，避免过度提升状态。
