@@ -230,6 +230,11 @@ export const exportToCanvas = async (
     exportPadding,
   );
 
+  const effectivePadding = getEffectiveExportPadding(
+    exportingFrame ? [exportingFrame] : getRootElements(elementsForRender),
+    exportPadding,
+  );
+
   const { canvas, scale = 1 } = createCanvas(width, height);
 
   const defaultAppState = getDefaultAppState();
@@ -257,8 +262,8 @@ export const exportToCanvas = async (
       ...appState,
       frameRendering,
       viewBackgroundColor: exportBackground ? viewBackgroundColor : null,
-      scrollX: -minX + exportPadding,
-      scrollY: -minY + exportPadding,
+      scrollX: -minX + effectivePadding,
+      scrollY: -minY + effectivePadding,
       zoom: defaultAppState.zoom,
       shouldCacheIgnoreZoom: false,
       theme: appState.exportWithDarkMode ? THEME.DARK : THEME.LIGHT,
@@ -339,8 +344,12 @@ export const exportToSvg = async (
     exportPadding,
   );
 
-  const offsetX = -minX + exportPadding;
-  const offsetY = -minY + exportPadding;
+  const effectivePadding = getEffectiveExportPadding(
+    exportingFrame ? [exportingFrame] : getRootElements(elementsForRender),
+    exportPadding,
+  );
+  const offsetX = -minX + effectivePadding;
+  const offsetY = -minY + effectivePadding;
 
   // ---------------------------------------------------------------------------
   // initialize SVG root element
@@ -560,14 +569,42 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
   throw new Error("INVALID");
 };
 
+// 获取元素集合中最大的描边宽度
+const getMaxStrokeWidth = (
+  elements: readonly NonDeletedExcalidrawElement[],
+): number => {
+  let maxStrokeWidth = 0;
+  elements.forEach((element) => {
+    if (element.strokeWidth) {
+      maxStrokeWidth = Math.max(maxStrokeWidth, element.strokeWidth);
+    }
+  });
+  return maxStrokeWidth;
+};
+
+// 计算实际使用的 padding，考虑描边宽度的影响
+// 仅当 exportPadding > 0 时才根据描边宽度扩展，以尊重 exportPadding=0 的显式选择
+const getEffectiveExportPadding = (
+  elements: readonly NonDeletedExcalidrawElement[],
+  exportPadding: number,
+): number => {
+  if (exportPadding <= 0) {
+    return exportPadding;
+  }
+  const maxStrokeWidth = getMaxStrokeWidth(elements);
+  return Math.max(exportPadding, maxStrokeWidth / 2);
+};
+
 // calculate smallest area to fit the contents in
 const getCanvasSize = (
   elements: readonly NonDeletedExcalidrawElement[],
   exportPadding: number,
 ): Bounds => {
   const [minX, minY, maxX, maxY] = getCommonBounds(elements);
-  const width = distance(minX, maxX) + exportPadding * 2;
-  const height = distance(minY, maxY) + exportPadding * 2;
+  // 描边会从元素边界向外扩展 strokeWidth/2，需要确保 padding 足够容纳
+  const effectivePadding = getEffectiveExportPadding(elements, exportPadding);
+  const width = distance(minX, maxX) + effectivePadding * 2;
+  const height = distance(minY, maxY) + effectivePadding * 2;
 
   return [minX, minY, width, height];
 };
