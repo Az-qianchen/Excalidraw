@@ -2351,27 +2351,20 @@ class App extends React.Component<AppProps, AppState> {
                               if (!maskingElement) {
                                 return null;
                               }
-                              const [x1, y1] = getElementAbsoluteCoords(
-                                maskingElement,
-                                elementsMap,
-                              );
-                              const { x: viewportX, y: viewportY } =
-                                sceneCoordsToViewportCoords(
-                                  {
-                                    sceneX: x1 + maskingElement.width,
-                                    sceneY: y1,
-                                  },
-                                  this.state,
-                                );
-                              const btnX =
-                                viewportX - this.state.offsetLeft + 10;
-                              const btnY = viewportY - this.state.offsetTop;
+                              const sidebarOpen =
+                                !!this.state.openSidebar &&
+                                editorJotaiStore.get(isSidebarDockedAtom) &&
+                                this.editorInterface.canFitSidebar;
                               return (
                                 <div
                                   className="excalidraw-canvas-buttons"
                                   style={{
-                                    top: `${btnY}px`,
-                                    left: `${btnX}px`,
+                                    position: "absolute",
+                                    right: sidebarOpen
+                                      ? "calc(var(--right-sidebar-width) + 12px)"
+                                      : "12px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
                                   }}
                                 >
                                   <ToolButton
@@ -2452,27 +2445,20 @@ class App extends React.Component<AppProps, AppState> {
                               if (!mwElement) {
                                 return null;
                               }
-                              const [x1, y1] = getElementAbsoluteCoords(
-                                mwElement,
-                                elementsMap,
-                              );
-                              const { x: viewportX, y: viewportY } =
-                                sceneCoordsToViewportCoords(
-                                  {
-                                    sceneX: x1 + mwElement.width,
-                                    sceneY: y1,
-                                  },
-                                  this.state,
-                                );
-                              const btnX =
-                                viewportX - this.state.offsetLeft + 10;
-                              const btnY = viewportY - this.state.offsetTop;
+                              const mwSidebarOpen =
+                                !!this.state.openSidebar &&
+                                editorJotaiStore.get(isSidebarDockedAtom) &&
+                                this.editorInterface.canFitSidebar;
                               return (
                                 <div
                                   className="excalidraw-canvas-buttons"
                                   style={{
-                                    top: `${btnY}px`,
-                                    left: `${btnX}px`,
+                                    position: "absolute",
+                                    right: mwSidebarOpen
+                                      ? "calc(var(--right-sidebar-width) + 12px)"
+                                      : "12px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
                                   }}
                                 >
                                   {this.renderMagicWandNumberInput(
