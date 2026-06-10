@@ -2301,22 +2301,6 @@ const _renderInteractiveScene = ({
         }
       }
 
-      if (appState.maskingElementId) {
-        const maskingElement = elementsMap.get(appState.maskingElementId);
-
-        if (maskingElement && isImageElement(maskingElement)) {
-          renderMaskEditor(context, renderConfig, appState, maskingElement);
-        }
-      }
-
-      if (appState.magicWandElementId) {
-        const magicWandElement = elementsMap.get(appState.magicWandElementId);
-
-        if (magicWandElement && isImageElement(magicWandElement)) {
-          renderMagicWandOverlay(context, renderConfig, appState, magicWandElement, app);
-        }
-      }
-
       // 渲染元素尺寸标签
       if (
         showBoundingBox &&
@@ -2389,6 +2373,23 @@ const _renderInteractiveScene = ({
         selectionColor,
       );
     }
+
+    if (appState.maskingElementId) {
+      const maskingElement = elementsMap.get(appState.maskingElementId);
+
+      if (maskingElement && isImageElement(maskingElement)) {
+        renderMaskEditor(context, renderConfig, appState, maskingElement);
+      }
+    }
+
+    if (appState.magicWandElementId) {
+      const magicWandElement = elementsMap.get(appState.magicWandElementId);
+
+      if (magicWandElement && isImageElement(magicWandElement)) {
+        renderMagicWandOverlay(context, renderConfig, appState, magicWandElement, app);
+      }
+    }
+
     context.restore();
   }
 

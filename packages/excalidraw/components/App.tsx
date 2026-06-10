@@ -684,6 +684,8 @@ class App extends React.Component<AppProps, AppState> {
    * 只从这里恢复遮罩点，避免尚未应用的临时点位进入全局历史记录。
    */
   private maskPointHistory: GlobalPoint[][] = [];
+  private maskDragPointIndex: number = -1;
+  private maskDragPoints: GlobalPoint[] | null = null;
 
   /** 魔法抠图图像数据缓存 */
   private magicWandImageData: ImageData | null = null;
@@ -6730,6 +6732,8 @@ class App extends React.Component<AppProps, AppState> {
   private finishMasking = () => {
     if (this.state.maskingElementId) {
       this.maskPointHistory = [];
+      this.maskDragPointIndex = -1;
+      this.maskDragPoints = null;
       this.store.scheduleAction(CaptureUpdateAction.NEVER);
       this.setState({
         maskingElementId: null,
@@ -8642,22 +8646,25 @@ class App extends React.Component<AppProps, AppState> {
     this.clearSelectionIfNotUsingSelection();
 
     if (this.handleSelectionOnPointerDown(event, pointerDownState)) {
-      return;
+      if (!this.state.maskingElementId && !this.state.magicWandElementId) {
+        return;
+      }
     }
 
-    const allowOnPointerDown =
-      !this.state.penMode ||
-      event.pointerType !== "touch" ||
-      this.state.activeTool.type === "selection" ||
-      this.state.activeTool.type === "lasso" ||
-      this.state.activeTool.type === "text" ||
-      this.state.activeTool.type === "image";
+    if (!this.state.maskingElementId && !this.state.magicWandElementId) {
+      const allowOnPointerDown =
+        !this.state.penMode ||
+        event.pointerType !== "touch" ||
+        this.state.activeTool.type === "selection" ||
+        this.state.activeTool.type === "lasso" ||
+        this.state.activeTool.type === "text" ||
+        this.state.activeTool.type === "image";
 
-    if (!allowOnPointerDown) {
-      return;
-    }
+      if (!allowOnPointerDown) {
+        return;
+      }
 
-    if (this.state.activeTool.type === "lasso") {
+      if (this.state.activeTool.type === "lasso") {
       const hitSelectedElement =
         pointerDownState.hit.element &&
         this.isASelectedElement(pointerDownState.hit.element);
@@ -8833,6 +8840,7 @@ class App extends React.Component<AppProps, AppState> {
         pointerDownState.lastCoords.y,
       );
     }
+    }
 
     const onPointerMove =
       this.onPointerMoveFromPointerDownHandler(pointerDownState);
@@ -8875,7 +8883,23 @@ class App extends React.Component<AppProps, AppState> {
 
     // 遮罩编辑模式下，只处理遮罩相关逻辑
     if (this.state.maskingElementId) {
-      this.setState({ isMasking: false });
+      if (this.maskDragPointIndex >= 0) {
+        const upCoords = viewportCoordsToSceneCoords(event, this.state);
+        const newPoint = pointFrom<GlobalPoint>(upCoords.x, upCoords.y);
+        const basePoints = this.maskDragPoints || this.state.maskingPoints;
+        this.setState({
+          maskingPoints: MaskEditor.movePoint(
+            basePoints,
+            this.maskDragPointIndex,
+            newPoint,
+          ),
+          isMasking: false,
+        });
+        this.maskDragPointIndex = -1;
+        this.maskDragPoints = null;
+      } else {
+        this.setState({ isMasking: false });
+      }
       return;
     }
 
@@ -9433,7 +9457,6 @@ class App extends React.Component<AppProps, AppState> {
           const y = pointerDownState.origin.y;
           const zoom = this.state.zoom.value;
 
-          // 检查是否点击了现有顶点
           const pointIndex = MaskEditor.getPointUnderCursor(
             this.state.maskingPoints,
             x,
@@ -9443,12 +9466,13 @@ class App extends React.Component<AppProps, AppState> {
 
           if (pointIndex >= 0) {
             this.maskPointHistory.push([...this.state.maskingPoints]);
+            this.maskDragPointIndex = pointIndex;
+            this.maskDragPoints = [...this.state.maskingPoints];
             this.setState({
               selectedMaskPointIndex: pointIndex,
               isMasking: true,
             });
           } else {
-            // 检查是否点击了中点
             const midpointIndex = MaskEditor.getMidpointUnderCursor(
               this.state.maskingPoints,
               x,
@@ -9459,12 +9483,15 @@ class App extends React.Component<AppProps, AppState> {
             if (midpointIndex >= 0) {
               const newPoint = pointFrom<GlobalPoint>(x, y);
               this.maskPointHistory.push([...this.state.maskingPoints]);
+              const insertedPoints = MaskEditor.insertPoint(
+                this.state.maskingPoints,
+                midpointIndex,
+                newPoint,
+              );
+              this.maskDragPointIndex = midpointIndex;
+              this.maskDragPoints = insertedPoints;
               this.setState({
-                maskingPoints: MaskEditor.insertPoint(
-                  this.state.maskingPoints,
-                  midpointIndex,
-                  newPoint,
-                ),
+                maskingPoints: insertedPoints,
                 selectedMaskPointIndex: midpointIndex,
                 isMasking: true,
               });
@@ -9512,7 +9539,9 @@ class App extends React.Component<AppProps, AppState> {
           !pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements &&
           (!this.state.selectedLinearElement?.isEditing ||
             (hitElement &&
-              hitElement?.id !== this.state.selectedLinearElement?.elementId))
+              hitElement?.id !== this.state.selectedLinearElement?.elementId)) &&
+          !this.state.maskingElementId &&
+          !this.state.magicWandElementId
         ) {
           this.clearSelection(hitElement);
         }
@@ -10568,17 +10597,19 @@ class App extends React.Component<AppProps, AppState> {
         }
       }
 
-      if (this.state.isMasking && this.state.selectedMaskPointIndex !== null) {
+      if (this.maskDragPointIndex >= 0 && this.maskDragPoints) {
         const newPoint = pointFrom<GlobalPoint>(
           pointerCoords.x,
           pointerCoords.y,
         );
+        const updatedPoints = MaskEditor.movePoint(
+          this.maskDragPoints,
+          this.maskDragPointIndex,
+          newPoint,
+        );
+        this.maskDragPoints = updatedPoints;
         this.setState({
-          maskingPoints: MaskEditor.movePoint(
-            this.state.maskingPoints,
-            this.state.selectedMaskPointIndex,
-            newPoint,
-          ),
+          maskingPoints: updatedPoints,
         });
         return false;
       }
@@ -11399,6 +11430,12 @@ class App extends React.Component<AppProps, AppState> {
       if (pointerDownState.eventListeners.onMove) {
         pointerDownState.eventListeners.onMove.flush();
       }
+
+      if (this.state.maskingElementId && this.maskDragPointIndex >= 0) {
+        this.maskDragPointIndex = -1;
+        this.maskDragPoints = null;
+      }
+
       const {
         newElement,
         resizingElement,
