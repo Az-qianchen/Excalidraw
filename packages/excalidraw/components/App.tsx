@@ -8422,7 +8422,7 @@ class App extends React.Component<AppProps, AppState> {
       this.setAppState({ snapLines: [] });
     }
 
-    // 遮罩编辑模式下，只允许在遮罩元素上操作，但允许拖拽画布
+    // 遮罩编辑模式下，阻止点击其他元素，但允许拖拽画布
     if (this.state.maskingElementId) {
       if (
         event.button === POINTER_BUTTON.WHEEL ||
@@ -8432,11 +8432,11 @@ class App extends React.Component<AppProps, AppState> {
         // 允许通过，不做拦截
       } else {
         const scenePointer2 = viewportCoordsToSceneCoords(event, this.state);
-        const hitForMask = this.getElementAtPosition(
+        const hitElement = this.getElementAtPosition(
           scenePointer2.x,
           scenePointer2.y,
         );
-        if (hitForMask?.id !== this.state.maskingElementId) {
+        if (hitElement && hitElement.id !== this.state.maskingElementId) {
           return;
         }
       }
