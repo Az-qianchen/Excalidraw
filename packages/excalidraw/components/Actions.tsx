@@ -179,6 +179,8 @@ export const SelectedShapeActions = ({
 
   const showCropEditorAction =
     !appState.croppingElementId &&
+    !appState.maskingElementId &&
+    !appState.magicWandElementId &&
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
 
@@ -187,11 +189,11 @@ export const SelectedShapeActions = ({
   const showMaskEditorAction =
     !appState.maskingElementId &&
     !appState.croppingElementId &&
+    !appState.magicWandElementId &&
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
 
-  const showMagicWandAction =
-    showMaskEditorAction && !appState.magicWandElementId;
+  const showMagicWandAction = showMaskEditorAction;
 
   const showAlignActions =
     !isSingleElementBoundContainer && alignActionsPredicate(appState, app);
@@ -690,11 +692,14 @@ const CombinedExtraActions = ({
   );
   const showCropEditorAction =
     !appState.croppingElementId &&
+    !appState.maskingElementId &&
+    !appState.magicWandElementId &&
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
   const showMaskEditorAction =
     !appState.maskingElementId &&
     !appState.croppingElementId &&
+    !appState.magicWandElementId &&
     targetElements.length === 1 &&
     isImageElement(targetElements[0]);
   const showLinkIcon = targetElements.length === 1;
