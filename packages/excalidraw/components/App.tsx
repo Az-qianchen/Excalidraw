@@ -7020,10 +7020,6 @@ class App extends React.Component<AppProps, AppState> {
       this.store.scheduleAction(CaptureUpdateAction.NEVER);
       this.setState({
         magicWandElementId: null,
-        magicWandThreshold: 20,
-        magicWandFeatherRadius: 0,
-        magicWandInverted: false,
-        magicWandContiguous: true,
       });
     }
     this.magicWandImageData = null;

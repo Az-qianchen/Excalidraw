@@ -27,10 +27,6 @@ export const actionToggleMagicWand = register({
       appState: {
         ...appState,
         magicWandElementId: selectedElement.id,
-        magicWandThreshold: 20,
-        magicWandFeatherRadius: 0,
-        magicWandInverted: false,
-        magicWandContiguous: true,
       },
       captureUpdate: CaptureUpdateAction.NEVER,
     };
