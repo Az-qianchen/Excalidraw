@@ -36,6 +36,8 @@ export const actionToggleCropEditor = register({
     const selectedElements = app.scene.getSelectedElements(appState);
     if (
       !appState.croppingElementId &&
+      !appState.maskingElementId &&
+      !appState.magicWandElementId &&
       selectedElements.length === 1 &&
       isImageElement(selectedElements[0])
     ) {

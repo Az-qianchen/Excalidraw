@@ -5123,7 +5123,9 @@ class App extends React.Component<AppProps, AppState> {
         if (
           selectedElements.length === 1 &&
           isImageElement(selectedElements[0]) &&
-          event.key === KEYS.ENTER
+          event.key === KEYS.ENTER &&
+          !this.state.maskingElementId &&
+          !this.state.magicWandElementId
         ) {
           this.startImageCropping(selectedElements[0]);
           return;
@@ -7091,6 +7093,8 @@ class App extends React.Component<AppProps, AppState> {
   ) => {
     if (
       this.state.editingTextElement ||
+      this.state.maskingElementId ||
+      this.state.magicWandElementId ||
       !this.shouldHandleBrowserCanvasDoubleClick(event.type)
     ) {
       return;
