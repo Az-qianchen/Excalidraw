@@ -9480,7 +9480,7 @@ class App extends React.Component<AppProps, AppState> {
               });
             }
           }
-          return false;
+          return true;
         }
 
         if (pointerDownState.hit.element) {
