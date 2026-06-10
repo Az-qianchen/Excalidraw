@@ -9246,7 +9246,9 @@ class App extends React.Component<AppProps, AppState> {
         !(
           this.state.selectedLinearElement &&
           this.state.selectedLinearElement.hoverPointIndex !== -1
-        )
+        ) &&
+        !this.state.maskingElementId &&
+        !this.state.magicWandElementId
       ) {
         const elementWithTransformHandleType =
           getElementWithTransformHandleType(

@@ -2272,7 +2272,11 @@ const _renderInteractiveScene = ({
         // do not show transform handles when text is being edited
         !isTextElement(appState.editingTextElement) &&
         // do not show transform handles when image is being cropped
-        !appState.croppingElementId
+        !appState.croppingElementId &&
+        // do not show transform handles during mask editor
+        !appState.maskingElementId &&
+        // do not show transform handles during magic wand
+        !appState.magicWandElementId
       ) {
         renderTransformHandles(
           context,
@@ -2314,7 +2318,12 @@ const _renderInteractiveScene = ({
       }
 
       // 渲染元素尺寸标签
-      if (showBoundingBox && !isTextElement(appState.editingTextElement)) {
+      if (
+        showBoundingBox &&
+        !isTextElement(appState.editingTextElement) &&
+        !appState.maskingElementId &&
+        !appState.magicWandElementId
+      ) {
         renderElementSizeLabel(
           context,
           appState,
