@@ -260,6 +260,7 @@ import {
   getUncroppedWidthAndHeight,
   getActiveTextElement,
   isEligibleFrameChildType,
+  isFreeDrawElement,
 } from "@excalidraw/element";
 
 import type { GlobalPoint, LocalPoint, Radians } from "@excalidraw/math";
@@ -731,6 +732,24 @@ class App extends React.Component<AppProps, AppState> {
   /** current frame pointer cords */
   lastPointerMoveCoords: { x: number; y: number } | null = null;
   private lastCompletedCanvasClicks: { x: number; y: number }[] = [];
+  /**
+   * 键盘缩放模式的运行时状态（按 S 进入，按数字键/鼠标调整倍率，Enter/左键确认，Esc/右键取消）。
+   * 仅在非输入框聚焦时生效；激活时其他快捷键被忽略。
+   */
+  private keyboardScale: {
+    originalElements: ExcalidrawElement[];
+    originalBoundTexts: Map<
+      string,
+      { id: string; fontSize: number }
+    >;
+    pivot: { x: number; y: number };
+    initialDistance: number;
+    pointerScale: number;
+    currentScale: number;
+    inputBuffer: string;
+    pointerLocked: boolean;
+    cleanup: () => void;
+  } | null = null;
   /** previous frame pointer coords */
   previousPointerMoveCoords: { x: number; y: number } | null = null;
   lastViewportPosition = { x: 0, y: 0 };
@@ -2647,6 +2666,28 @@ class App extends React.Component<AppProps, AppState> {
                           {showShapeSwitchPanel && (
                             <ConvertElementTypePopup app={this} />
                           )}
+                          {this.keyboardScale && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                bottom: 20,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                padding: "4px 10px",
+                                background: "#4262fa",
+                                color: "#fff",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                fontFamily: "Inter, system-ui, sans-serif",
+                                borderRadius: 10,
+                                pointerEvents: "none",
+                                zIndex: 10,
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {this.keyboardScale.currentScale.toFixed(2)}
+                            </div>
+                          )}
                         </ExcalidrawActionManagerContext.Provider>
                         {this.renderEmbeddables()}
                       </ExcalidrawElementsContext.Provider>
@@ -3429,6 +3470,10 @@ class App extends React.Component<AppProps, AppState> {
     this.editorLifecycleEvents.emit("editor:unmount");
     this.props.onUnmount?.();
     this.props.onExcalidrawAPI?.(null);
+
+    if (this.keyboardScale) {
+      this.finishKeyboardScale(false);
+    }
 
     (window as any).launchQueue?.setConsumer(() => {});
 
@@ -5117,6 +5162,68 @@ class App extends React.Component<AppProps, AppState> {
           }
         }
 
+        // 键盘缩放模式键盘与鼠标事件（按 S 进入，按数字/移动鼠标调整倍率，Enter/左键确认，Esc/右键取消）
+        if (this.keyboardScale) {
+          if (event.key === KEYS.ESCAPE) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.finishKeyboardScale(false);
+            return;
+          }
+          if (event.key === KEYS.ENTER) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.finishKeyboardScale(true);
+            return;
+          }
+          if (event.key === KEYS.BACKSPACE) {
+            const state = this.keyboardScale;
+            if (state.inputBuffer.length > 0) {
+              event.preventDefault();
+              event.stopPropagation();
+              state.inputBuffer = state.inputBuffer.slice(0, -1);
+              if (state.inputBuffer.length === 0) {
+                state.pointerLocked = false;
+                this.applyKeyboardScale(state.pointerScale);
+              } else {
+                const num = parseFloat(state.inputBuffer);
+                if (!Number.isNaN(num) && num > 0) {
+                  this.applyKeyboardScale(num);
+                }
+              }
+            }
+            return;
+          }
+          if (event.key === "." || event.key === ",") {
+            const state = this.keyboardScale;
+            if (!state.inputBuffer.includes(".")) {
+              event.preventDefault();
+              event.stopPropagation();
+              state.inputBuffer += ".";
+              state.pointerLocked = true;
+              const num = parseFloat(state.inputBuffer);
+              if (!Number.isNaN(num) && num > 0) {
+                this.applyKeyboardScale(num);
+              }
+            }
+            return;
+          }
+          if (/^[0-9]$/.test(event.key)) {
+            event.preventDefault();
+            event.stopPropagation();
+            const state = this.keyboardScale;
+            state.inputBuffer += event.key;
+            state.pointerLocked = true;
+            const num = parseFloat(state.inputBuffer);
+            if (!Number.isNaN(num) && num > 0) {
+              this.applyKeyboardScale(num);
+            }
+            return;
+          }
+          // 忽略其他按键，直到缩放模式结束
+          return;
+        }
+
         const selectedElements = getSelectedElements(
           this.scene.getNonDeletedElementsMap(),
           this.state,
@@ -5466,7 +5573,7 @@ class App extends React.Component<AppProps, AppState> {
         maybeHandleArrowPointlikeDrag({ app: this, event });
       }
 
-      if (isArrowKey(event.key)) {
+      if (isArrowKey(event.key) && !this.keyboardScale) {
         let selectedElements = this.scene.getSelectedElements({
           selectedElementIds: this.state.selectedElementIds,
           includeBoundTextElement: true,
@@ -5613,6 +5720,21 @@ class App extends React.Component<AppProps, AppState> {
           event.stopPropagation();
         }
         if (event.key === KEYS.S) {
+          if (
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey &&
+            !event.shiftKey &&
+            selectedElements.length > 0 &&
+            this.state.activeTool.type === "selection" &&
+            !this.state.croppingElementId &&
+            !this.state.maskingElementId &&
+            !this.state.magicWandElementId
+          ) {
+            this.startKeyboardScale();
+            event.stopPropagation();
+            return;
+          }
           this.setState({ openPopup: "elementStroke" });
           event.stopPropagation();
         }
@@ -6743,6 +6865,231 @@ class App extends React.Component<AppProps, AppState> {
         isMasking: false,
       });
     }
+  };
+
+  // ---------------------------------------------------------------------------
+  // 键盘缩放（按 S 进入，数字/鼠标调倍率，Enter/左键确认，Esc/右键取消）
+  // ---------------------------------------------------------------------------
+
+  private startKeyboardScale = () => {
+    if (this.keyboardScale) return;
+    if (this.state.activeTool.type !== "selection") return;
+    if (
+      this.state.croppingElementId ||
+      this.state.maskingElementId ||
+      this.state.magicWandElementId
+    ) {
+      return;
+    }
+
+    const selectedElements = this.scene.getSelectedElements(this.state);
+    if (selectedElements.length === 0) return;
+
+    const [minX, minY, maxX, maxY] = getCommonBounds(selectedElements);
+    const pivot = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+
+    const lastPointer = this.lastPointerMoveEvent;
+    const initialPointerScene = lastPointer
+      ? viewportCoordsToSceneCoords(lastPointer, this.state)
+      : pivot;
+    let initialDistance = Math.hypot(
+      initialPointerScene.x - pivot.x,
+      initialPointerScene.y - pivot.y,
+    );
+    if (!Number.isFinite(initialDistance) || initialDistance < 1e-6) {
+      initialDistance = 1;
+    }
+
+    const originalElements = selectedElements.map(
+      (el) => ({ ...el }) as ExcalidrawElement,
+    );
+    const originalBoundTexts = new Map<
+      string,
+      { id: string; fontSize: number }
+    >();
+    const elementsMap = this.scene.getNonDeletedElementsMap();
+    for (const el of selectedElements) {
+      const bt = getBoundTextElement(el, elementsMap);
+      if (bt && isTextElement(bt)) {
+        originalBoundTexts.set(el.id, { id: bt.id, fontSize: bt.fontSize });
+      }
+    }
+
+    const self = this;
+    const state = {
+      originalElements,
+      originalBoundTexts,
+      pivot,
+      initialDistance,
+      pointerScale: 1,
+      currentScale: 1,
+      inputBuffer: "",
+      pointerLocked: false,
+      cleanup: () => {},
+    };
+    this.keyboardScale = state;
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!self.keyboardScale || self.keyboardScale.pointerLocked) return;
+      const scene = viewportCoordsToSceneCoords(event, self.state);
+      const distance = Math.hypot(scene.x - pivot.x, scene.y - pivot.y);
+      const ratio = distance / state.initialDistance;
+      if (Number.isFinite(ratio) && ratio > 0) {
+        state.inputBuffer = "";
+        state.pointerScale = ratio;
+        self.applyKeyboardScale(ratio);
+      }
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!self.keyboardScale) return;
+      if (event.button === POINTER_BUTTON.MAIN) {
+        event.preventDefault();
+        event.stopPropagation();
+        self.finishKeyboardScale(true);
+      } else if (event.button === POINTER_BUTTON.SECONDARY) {
+        event.preventDefault();
+        event.stopPropagation();
+        self.finishKeyboardScale(false);
+      }
+    };
+
+    const onContextMenu = (event: MouseEvent) => {
+      if (self.keyboardScale) event.preventDefault();
+    };
+
+    state.cleanup = () => {
+      window.removeEventListener(EVENT.POINTER_MOVE, onPointerMove);
+      window.removeEventListener(EVENT.POINTER_DOWN, onPointerDown, true);
+      window.removeEventListener("contextmenu", onContextMenu, true);
+    };
+
+    window.addEventListener(EVENT.POINTER_MOVE, onPointerMove);
+    window.addEventListener(EVENT.POINTER_DOWN, onPointerDown, true);
+    window.addEventListener("contextmenu", onContextMenu, true);
+
+    this.store.scheduleCapture();
+  };
+
+  private applyKeyboardScale = (scale: number) => {
+    const state = this.keyboardScale;
+    if (!state) return;
+
+    const magnitude = Math.max(Math.abs(scale), 0.01);
+    state.currentScale = magnitude;
+
+    const { pivot, originalElements } = state;
+
+    for (const orig of originalElements) {
+      const latest = this.scene.getElement(orig.id);
+      if (!latest) continue;
+
+      const newX = pivot.x + (orig.x - pivot.x) * magnitude;
+      const newY = pivot.y + (orig.y - pivot.y) * magnitude;
+      const newWidth = Math.max(orig.width * magnitude, 1);
+      const newHeight = Math.max(orig.height * magnitude, 1);
+
+      const updates: Record<string, unknown> = {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      };
+
+      if (
+        (isLinearElement(orig) || isFreeDrawElement(orig)) &&
+        "points" in orig
+      ) {
+        const origPoints = (
+          orig as { points: readonly (readonly [number, number])[] }
+        ).points;
+        updates.points = origPoints.map(
+          (p) => [p[0] * magnitude, p[1] * magnitude] as [number, number],
+        );
+      }
+
+      if (isTextElement(orig)) {
+        updates.fontSize = (orig as ExcalidrawTextElement).fontSize * magnitude;
+      }
+
+      this.scene.mutateElement(latest, updates as any, {
+        informMutation: false,
+        isDragging: false,
+      });
+    }
+
+    const elementsMap = this.scene.getNonDeletedElementsMap();
+    for (const [, btInfo] of state.originalBoundTexts) {
+      const bt = elementsMap.get(btInfo.id);
+      const container = this.scene.getElement(
+        state.originalElements.find((e) => {
+          const candidate = getBoundTextElement(e, elementsMap);
+          return candidate?.id === btInfo.id;
+        })?.id ?? "",
+      );
+      if (bt && isTextElement(bt) && container) {
+        this.scene.mutateElement(
+          bt,
+          { fontSize: btInfo.fontSize * magnitude },
+          { informMutation: false, isDragging: false },
+        );
+      }
+    }
+
+    this.scene.triggerUpdate();
+  };
+
+  private finishKeyboardScale = (commit: boolean) => {
+    const state = this.keyboardScale;
+    if (!state) return;
+
+    state.cleanup();
+
+    if (!commit) {
+      for (const orig of state.originalElements) {
+        const latest = this.scene.getElement(orig.id);
+        if (!latest) continue;
+
+        const restore: Record<string, unknown> = {
+          x: orig.x,
+          y: orig.y,
+          width: orig.width,
+          height: orig.height,
+        };
+
+        if (
+          (isLinearElement(orig) || isFreeDrawElement(orig)) &&
+          "points" in orig
+        ) {
+          restore.points = orig.points;
+        }
+
+        if (isTextElement(orig)) {
+          restore.fontSize = (orig as ExcalidrawTextElement).fontSize;
+        }
+
+        this.scene.mutateElement(latest, restore, {
+          informMutation: false,
+          isDragging: false,
+        });
+      }
+
+      const elementsMap = this.scene.getNonDeletedElementsMap();
+      for (const [, btInfo] of state.originalBoundTexts) {
+        const bt = elementsMap.get(btInfo.id);
+        if (bt && isTextElement(bt)) {
+          this.scene.mutateElement(
+            bt,
+            { fontSize: btInfo.fontSize },
+            { informMutation: false, isDragging: false },
+          );
+        }
+      }
+
+      this.scene.triggerUpdate();
+    }
+
+    this.keyboardScale = null;
   };
 
   private isApplyingMask = false;
