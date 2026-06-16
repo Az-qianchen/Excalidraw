@@ -13,10 +13,12 @@ import {
 import {
   arrayToMap,
   BIND_MODE_TIMEOUT,
+  DEFAULT_ADAPTIVE_RADIUS,
   DEFAULT_TRANSFORM_HANDLE_SPACING,
   FRAME_STYLE,
   getFeatureFlag,
   invariant,
+  ROUNDNESS,
   THEME,
 } from "@excalidraw/common";
 
@@ -40,6 +42,8 @@ import {
   isLineElement,
   maxBindingDistance_simple,
   isTextElement,
+  isUsingAdaptiveRadius,
+  getCornerRadiusHandleCoords,
   LinearElementEditor,
   getActiveTextElement,
 } from "@excalidraw/element";
@@ -1704,6 +1708,104 @@ const renderMagicWandOverlay = (
   }
 };
 
+// ==================== 圆角调节手柄 ====================
+const CORNER_RADIUS_HANDLE_RADIUS_PX = 4;
+const CORNER_RADIUS_LABEL_FONT_SIZE = 12;
+const CORNER_RADIUS_LABEL_FONT_WEIGHT = "600";
+const CORNER_RADIUS_LABEL_FONT_FAMILY = "Inter, system-ui, sans-serif";
+const CORNER_RADIUS_LABEL_FONT = `${CORNER_RADIUS_LABEL_FONT_WEIGHT} ${CORNER_RADIUS_LABEL_FONT_SIZE}px ${CORNER_RADIUS_LABEL_FONT_FAMILY}`;
+const CORNER_RADIUS_LABEL_PADDING_X = 10;
+const CORNER_RADIUS_LABEL_PADDING_Y = 4;
+
+let _cornerRadiusMeasureCanvas: HTMLCanvasElement | null = null;
+let _cornerRadiusMeasureCtx: CanvasRenderingContext2D | null = null;
+
+const measureCornerRadiusLabelText = (text: string): number => {
+  if (typeof document === "undefined") {
+    return text.length * 7;
+  }
+  if (!_cornerRadiusMeasureCanvas) {
+    _cornerRadiusMeasureCanvas = document.createElement("canvas");
+    _cornerRadiusMeasureCtx = _cornerRadiusMeasureCanvas.getContext("2d");
+  }
+  if (!_cornerRadiusMeasureCtx) {
+    return text.length * 7;
+  }
+  _cornerRadiusMeasureCtx.font = CORNER_RADIUS_LABEL_FONT;
+  return _cornerRadiusMeasureCtx.measureText(text).width;
+};
+
+const renderCornerRadiusHandle = (
+  context: CanvasRenderingContext2D,
+  appState: InteractiveCanvasAppState,
+  element: ExcalidrawElement,
+  selectionColor: string,
+  isDragging: boolean,
+  dragValue: number | null,
+) => {
+  const zoom = appState.zoom.value;
+  const { handleX, handleY } = getCornerRadiusHandleCoords(
+    element,
+    appState.zoom,
+  );
+
+  context.save();
+  context.fillStyle = "#fff";
+  context.strokeStyle = selectionColor || "#4262fa";
+  context.lineWidth = 1 / zoom;
+
+  const handleRadius = CORNER_RADIUS_HANDLE_RADIUS_PX / zoom;
+  fillCircle(context, handleX, handleY, handleRadius, true);
+
+  // 拖拽时绘制数值标签
+  if (isDragging && dragValue !== null) {
+    const labelText = `R ${Math.round(dragValue)}`;
+    const textWidth = measureCornerRadiusLabelText(labelText);
+    const pillWidth = textWidth + CORNER_RADIUS_LABEL_PADDING_X * 2;
+    const pillHeight =
+      CORNER_RADIUS_LABEL_FONT_SIZE + CORNER_RADIUS_LABEL_PADDING_Y * 2;
+    const pillRadius = pillHeight / 2;
+
+    // 计算标签位置：在手柄上方再偏移 20px
+    const [labelX, labelY] = pointRotateRads(
+      pointFrom(element.x, element.y - 40 / zoom),
+      pointFrom(element.x + element.width / 2, element.y + element.height / 2),
+      element.angle,
+    );
+
+    context.save();
+    context.translate(labelX, labelY);
+    context.scale(1 / zoom, 1 / zoom);
+
+    // 绘制药丸形背景
+    context.fillStyle = selectionColor || "#4262fa";
+    context.beginPath();
+    if (context.roundRect) {
+      context.roundRect(
+        -pillWidth / 2,
+        -pillHeight / 2,
+        pillWidth,
+        pillHeight,
+        pillRadius,
+      );
+    } else {
+      context.rect(-pillWidth / 2, -pillHeight / 2, pillWidth, pillHeight);
+    }
+    context.fill();
+
+    // 绘制文字
+    context.fillStyle = "#ffffff";
+    context.font = CORNER_RADIUS_LABEL_FONT;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(labelText, 0, 0.5);
+
+    context.restore();
+  }
+
+  context.restore();
+};
+
 // ==================== 元素尺寸标签 ====================
 const SIZE_LABEL_FONT_SIZE = 12;
 const SIZE_LABEL_FONT_WEIGHT = "600";
@@ -2284,6 +2386,33 @@ const _renderInteractiveScene = ({
           appState,
           transformHandles,
           selectedElements[0].angle,
+        );
+      }
+
+      // 渲染圆角调节手柄
+      if (
+        !appState.viewModeEnabled &&
+        showBoundingBox &&
+        !isTextElement(appState.editingTextElement) &&
+        !appState.croppingElementId &&
+        !appState.maskingElementId &&
+        !appState.magicWandElementId &&
+        isUsingAdaptiveRadius(selectedElements[0].type)
+      ) {
+        const dragState = app.cornerRadiusDrag;
+        const isDragging =
+          dragState !== null && dragState.elementId === selectedElements[0].id;
+        const currentValue =
+          selectedElements[0].roundness?.type === ROUNDNESS.ADAPTIVE_RADIUS
+            ? selectedElements[0].roundness.value ?? DEFAULT_ADAPTIVE_RADIUS
+            : 0;
+        renderCornerRadiusHandle(
+          context,
+          appState,
+          selectedElements[0],
+          selectionColor,
+          isDragging,
+          isDragging ? currentValue : null,
         );
       }
 

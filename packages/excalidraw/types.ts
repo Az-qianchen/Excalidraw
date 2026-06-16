@@ -877,6 +877,7 @@ export type AppClassProperties = {
 
   setAppState: App["setAppState"];
   getMagicWandOverlayData: App["getMagicWandOverlayData"];
+  cornerRadiusDrag: App["cornerRadiusDrag"];
 };
 
 export type PointerDownState = Readonly<{

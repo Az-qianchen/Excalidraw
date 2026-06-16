@@ -8,6 +8,7 @@ import {
   DEFAULT_ELEMENT_STROKE_COLOR_PALETTE,
   DEFAULT_ELEMENT_STROKE_PICKS,
   ARROW_TYPE,
+  DEFAULT_ADAPTIVE_RADIUS,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
   FONT_FAMILY,
@@ -1593,6 +1594,75 @@ export const actionChangeVerticalAlign = register<VerticalAlign>({
   },
 });
 
+// 圆角半径数值输入 action
+export const actionChangeCornerRadius = register<number>({
+  name: "changeCornerRadius",
+  label: "Change corner radius",
+  trackEvent: false,
+  perform: (elements, appState, value) => {
+    if (value === undefined) {
+      return false;
+    }
+
+    return {
+      elements: changeProperty(elements, appState, (el) => {
+        if (!isUsingAdaptiveRadius(el.type)) {
+          return el;
+        }
+
+        if (value <= 0) {
+          return newElementWith(el, { roundness: null });
+        }
+
+        const maxRadius = Math.min(el.width, el.height) / 2;
+        const radiusValue = Math.max(0, Math.min(Math.round(value), Math.floor(maxRadius)));
+
+        return newElementWith(el, {
+          roundness: {
+            type: ROUNDNESS.ADAPTIVE_RADIUS,
+            value: radiusValue,
+          },
+        });
+      }),
+      appState,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    };
+  },
+  PanelComponent: ({ elements, appState, updateData, app }) => {
+    const targetElements = getTargetElements(
+      getNonDeletedElements(elements),
+      appState,
+    );
+
+    const adaptiveElements = targetElements.filter((el) =>
+      isUsingAdaptiveRadius(el.type),
+    );
+
+    if (adaptiveElements.length === 0) {
+      return null;
+    }
+
+    const commonValue = reduceToCommonValue(
+      adaptiveElements,
+      (el) =>
+        el.roundness?.type === ROUNDNESS.ADAPTIVE_RADIUS
+          ? el.roundness.value ?? DEFAULT_ADAPTIVE_RADIUS
+          : null,
+    );
+
+    const displayValue = commonValue ?? DEFAULT_ADAPTIVE_RADIUS;
+
+    return (
+      <StrokeWidthInput
+        value={displayValue}
+        onChange={(value) => updateData(value)}
+        min={0}
+        max={Infinity}
+      />
+    );
+  },
+});
+
 export const actionChangeRoundness = register<"sharp" | "round">({
   name: "changeRoundness",
   label: "Change edge roundness",
@@ -1632,6 +1702,26 @@ export const actionChangeRoundness = register<"sharp" | "round">({
       (el) => el.roundness?.type === ROUNDNESS.LEGACY,
     );
 
+    const roundnessValue = getFormValue(
+      elements,
+      app,
+      (element) =>
+        hasLegacyRoundness
+          ? null
+          : element.roundness
+          ? "round"
+          : "sharp",
+      (element) =>
+        !isArrowElement(element) && element.hasOwnProperty("roundness"),
+      (hasSelection) =>
+        hasSelection ? null : appState.currentItemRoundness,
+    );
+
+    const hasAdaptiveRadiusElements = targetElements.some((el) =>
+      isUsingAdaptiveRadius(el.type),
+    );
+    const isRound = roundnessValue === "round";
+
     return (
       <fieldset>
         <legend>{t("labels.edges")}</legend>
@@ -1650,23 +1740,13 @@ export const actionChangeRoundness = register<"sharp" | "round">({
                 icon: EdgeRoundIcon,
               },
             ]}
-            value={getFormValue(
-              elements,
-              app,
-              (element) =>
-                hasLegacyRoundness
-                  ? null
-                  : element.roundness
-                  ? "round"
-                  : "sharp",
-              (element) =>
-                !isArrowElement(element) && element.hasOwnProperty("roundness"),
-              (hasSelection) =>
-                hasSelection ? null : appState.currentItemRoundness,
-            )}
+            value={roundnessValue}
             onChange={(value) => updateData(value)}
           />
           {renderAction("togglePolygon")}
+          {isRound && hasAdaptiveRadiusElements && (
+            <>{renderAction("changeCornerRadius")}</>
+          )}
         </div>
       </fieldset>
     );

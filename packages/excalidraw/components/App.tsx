@@ -41,6 +41,7 @@ import {
   MQ_RIGHT_SIDEBAR_MIN_WIDTH,
   POINTER_BUTTON,
   ROUNDNESS,
+  DEFAULT_ADAPTIVE_RADIUS,
   SCROLL_TIMEOUT,
   TAP_TWICE_TIMEOUT,
   TEXT_TO_CENTER_SNAP_THRESHOLD,
@@ -228,6 +229,7 @@ import {
   getCursorForResizingElement,
   getElementWithTransformHandleType,
   getTransformHandleTypeFromCoords,
+  hitTestCornerRadiusHandle,
   dragNewElement,
   dragSelectedElements,
   getDragOffsetXY,
@@ -749,6 +751,12 @@ class App extends React.Component<AppProps, AppState> {
     inputBuffer: string;
     pointerLocked: boolean;
     cleanup: () => void;
+  } | null = null;
+  /** 圆角拖拽调节的运行时状态 */
+  cornerRadiusDrag: {
+    elementId: string;
+    originalValue: number;
+    initialPointerX: number;
   } | null = null;
   /** previous frame pointer coords */
   previousPointerMoveCoords: { x: number; y: number } | null = null;
@@ -3119,7 +3127,9 @@ class App extends React.Component<AppProps, AppState> {
 
   private onBlur = withBatchedUpdates(() => {
     isHoldingSpace = false;
+    this.cornerRadiusDrag = null;
     this.setState({
+      isResizing: false,
       isBindingEnabled: this.state.bindingPreference === "enabled",
     });
   });
@@ -3474,6 +3484,8 @@ class App extends React.Component<AppProps, AppState> {
     if (this.keyboardScale) {
       this.finishKeyboardScale(false);
     }
+
+    this.cornerRadiusDrag = null;
 
     (window as any).launchQueue?.setConsumer(() => {});
 
@@ -7913,6 +7925,11 @@ class App extends React.Component<AppProps, AppState> {
   ) => {
     this.savePointer(event.clientX, event.clientY, this.state.cursorButton);
     this.lastPointerMoveEvent = event.nativeEvent;
+
+    if (this.cornerRadiusDrag) {
+      return;
+    }
+
     const scenePointer = viewportCoordsToSceneCoords(event, this.state);
     const { x: scenePointerX, y: scenePointerY } = scenePointer;
     this.lastPointerMoveCoords = {
@@ -8364,6 +8381,23 @@ class App extends React.Component<AppProps, AppState> {
             selectedElements[0].points.length === 2)
         )
       ) {
+        // 检查圆角手柄悬停
+        if (
+          selectedElements.length === 1 &&
+          !this.state.croppingElementId &&
+          !this.state.maskingElementId &&
+          !this.state.magicWandElementId &&
+          hitTestCornerRadiusHandle(
+            selectedElements[0],
+            this.state.zoom,
+            scenePointerX,
+            scenePointerY,
+          )
+        ) {
+          setCursor(this.interactiveCanvas, "ew-resize");
+          return;
+        }
+
         const elementWithTransformHandleType =
           getElementWithTransformHandleType(
             elements,
@@ -9617,35 +9651,60 @@ class App extends React.Component<AppProps, AppState> {
         !this.state.maskingElementId &&
         !this.state.magicWandElementId
       ) {
-        const elementWithTransformHandleType =
-          getElementWithTransformHandleType(
-            elements,
-            this.state,
+        // 检查圆角手柄点击
+        if (
+          !this.state.croppingElementId &&
+          hitTestCornerRadiusHandle(
+            selectedElements[0],
+            this.state.zoom,
             pointerDownState.origin.x,
             pointerDownState.origin.y,
-            this.state.zoom,
-            event.pointerType,
-            this.scene.getNonDeletedElementsMap(),
-            this.editorInterface,
-          );
-        if (elementWithTransformHandleType != null) {
-          if (
-            elementWithTransformHandleType.transformHandleType === "rotation"
-          ) {
-            this.setState({
-              resizingElement: elementWithTransformHandleType.element,
-            });
-            pointerDownState.resize.handleType =
-              elementWithTransformHandleType.transformHandleType;
-          } else if (this.state.croppingElementId) {
-            pointerDownState.resize.handleType =
-              elementWithTransformHandleType.transformHandleType;
-          } else {
-            this.setState({
-              resizingElement: elementWithTransformHandleType.element,
-            });
-            pointerDownState.resize.handleType =
-              elementWithTransformHandleType.transformHandleType;
+          )
+        ) {
+          const element = selectedElements[0];
+          const originalValue =
+            element.roundness?.type === ROUNDNESS.ADAPTIVE_RADIUS
+              ? element.roundness.value ?? DEFAULT_ADAPTIVE_RADIUS
+              : 0;
+          this.cornerRadiusDrag = {
+            elementId: element.id,
+            originalValue,
+            initialPointerX: pointerDownState.origin.x,
+          };
+          this.store.scheduleCapture();
+        } else if (
+          !this.state.croppingElementId
+        ) {
+          const elementWithTransformHandleType =
+            getElementWithTransformHandleType(
+              elements,
+              this.state,
+              pointerDownState.origin.x,
+              pointerDownState.origin.y,
+              this.state.zoom,
+              event.pointerType,
+              this.scene.getNonDeletedElementsMap(),
+              this.editorInterface,
+            );
+          if (elementWithTransformHandleType != null) {
+            if (
+              elementWithTransformHandleType.transformHandleType === "rotation"
+            ) {
+              this.setState({
+                resizingElement: elementWithTransformHandleType.element,
+              });
+              pointerDownState.resize.handleType =
+                elementWithTransformHandleType.transformHandleType;
+            } else if (this.state.croppingElementId) {
+              pointerDownState.resize.handleType =
+                elementWithTransformHandleType.transformHandleType;
+            } else {
+              this.setState({
+                resizingElement: elementWithTransformHandleType.element,
+              });
+              pointerDownState.resize.handleType =
+                elementWithTransformHandleType.transformHandleType;
+            }
           }
         }
       } else if (selectedElements.length > 1) {
@@ -9679,7 +9738,7 @@ class App extends React.Component<AppProps, AppState> {
             selectedElements[0],
           );
         }
-      } else {
+      } else if (!this.cornerRadiusDrag) {
         if (this.state.selectedLinearElement) {
           const linearElementEditor = this.state.selectedLinearElement;
           const ret = LinearElementEditor.handlePointerDown(
@@ -9884,7 +9943,8 @@ class App extends React.Component<AppProps, AppState> {
             (hitElement &&
               hitElement?.id !== this.state.selectedLinearElement?.elementId)) &&
           !this.state.maskingElementId &&
-          !this.state.magicWandElementId
+          !this.state.magicWandElementId &&
+          !this.cornerRadiusDrag
         ) {
           this.clearSelection(hitElement);
         }
@@ -10929,6 +10989,34 @@ class App extends React.Component<AppProps, AppState> {
         event[KEYS.CTRL_OR_CMD] ? null : this.getEffectiveGridSize(),
       );
 
+      if (this.cornerRadiusDrag) {
+        setCursor(this.interactiveCanvas, "ew-resize");
+        const element = this.scene.getElement(this.cornerRadiusDrag.elementId);
+        if (element) {
+          const dx = pointerCoords.x - this.cornerRadiusDrag.initialPointerX;
+          const maxRadius = Math.min(element.width, element.height) / 2;
+          const newValue = Math.max(
+            0,
+            Math.min(
+              Math.round(this.cornerRadiusDrag.originalValue + dx),
+              Math.floor(maxRadius),
+            ),
+          );
+          this.scene.mutateElement(
+            element,
+            {
+              roundness:
+                newValue === 0
+                  ? null
+                  : { type: ROUNDNESS.ADAPTIVE_RADIUS, value: newValue },
+            },
+            { informMutation: true, isDragging: false },
+          );
+          this.setState({ isResizing: true });
+        }
+        return true;
+      }
+
       if (pointerDownState.resize.isResizing) {
         pointerDownState.lastCoords.x = pointerCoords.x;
         pointerDownState.lastCoords.y = pointerCoords.y;
@@ -11777,6 +11865,33 @@ class App extends React.Component<AppProps, AppState> {
       if (this.state.maskingElementId && this.maskDragPointIndex >= 0) {
         this.maskDragPointIndex = -1;
         this.maskDragPoints = null;
+      }
+
+      if (this.cornerRadiusDrag) {
+        const element = this.scene.getElement(this.cornerRadiusDrag.elementId);
+        this.cornerRadiusDrag = null;
+        this.setState((prevState) => ({
+          isResizing: false,
+          cursorButton: "up" as const,
+          selectionElement: null,
+          resizingElement: null,
+          elementsToHighlight: null,
+          selectedElementsAreBeingDragged: false,
+          currentItemRoundness: element?.roundness
+            ? "round" as const
+            : element
+            ? "sharp" as const
+            : prevState.currentItemRoundness,
+          snapLines: updateStable(prevState.snapLines, []),
+          originSnapOffset: null,
+        }));
+        this.previousPointerMoveCoords = null;
+        SnapCache.setReferenceSnapPoints(null);
+        SnapCache.setVisibleGaps(null);
+        this.savePointer(childEvent.clientX, childEvent.clientY, "up");
+        setCursorForShape(this.interactiveCanvas, this.state);
+        this.store.scheduleCapture();
+        return;
       }
 
       const {

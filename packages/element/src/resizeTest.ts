@@ -7,6 +7,7 @@ import {
 
 import {
   SIDE_RESIZING_THRESHOLD,
+  DEFAULT_TRANSFORM_HANDLE_SPACING,
   type EditorInterface,
 } from "@excalidraw/common";
 
@@ -22,7 +23,11 @@ import {
   getOmitSidesForEditorInterface,
   canResizeFromSides,
 } from "./transformHandles";
-import { isImageElement, isLinearElement } from "./typeChecks";
+import {
+  isImageElement,
+  isLinearElement,
+  isUsingAdaptiveRadius,
+} from "./typeChecks";
 
 import type {
   TransformHandleType,
@@ -291,4 +296,47 @@ const getSelectionBorders = <Point extends LocalPoint | GlobalPoint>(
     s: [bottomRight, bottomLeft],
     w: [bottomLeft, topLeft],
   };
+};
+
+const ROTATION_RESIZE_HANDLE_GAP = 16;
+const CORNER_RADIUS_HANDLE_HIT_RADIUS_PX = 8;
+
+export const getCornerRadiusHandleCoords = (
+  element: ExcalidrawElement,
+  zoom: Zoom,
+): { handleX: number; handleY: number } => {
+  const cx = element.x + element.width / 2;
+  const cy = element.y + element.height / 2;
+  const margin = isImageElement(element) ? 0 : DEFAULT_TRANSFORM_HANDLE_SPACING;
+  const spacing = isImageElement(element) ? 0 : DEFAULT_TRANSFORM_HANDLE_SPACING;
+  const offset = margin + ROTATION_RESIZE_HANDLE_GAP + spacing;
+  const handle = pointFrom(
+    element.x,
+    element.y - offset / zoom.value,
+  );
+  const [rotatedHandleX, rotatedHandleY] = pointRotateRads(
+    handle,
+    pointFrom(cx, cy),
+    element.angle,
+  );
+  return {
+    handleX: rotatedHandleX,
+    handleY: rotatedHandleY,
+  };
+};
+
+export const hitTestCornerRadiusHandle = (
+  element: NonDeletedExcalidrawElement,
+  zoom: Zoom,
+  sceneX: number,
+  sceneY: number,
+): boolean => {
+  if (!isUsingAdaptiveRadius(element.type)) {
+    return false;
+  }
+  const { handleX, handleY } = getCornerRadiusHandleCoords(element, zoom);
+  const hitRadius = CORNER_RADIUS_HANDLE_HIT_RADIUS_PX / zoom.value;
+  const dx = sceneX - handleX;
+  const dy = sceneY - handleY;
+  return dx * dx + dy * dy <= hitRadius * hitRadius;
 };

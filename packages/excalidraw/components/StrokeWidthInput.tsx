@@ -8,19 +8,23 @@ interface StrokeWidthInputProps {
   value: number | null;
   onChange: (value: number) => void;
   disabled?: boolean;
+  min?: number;
+  max?: number;
 }
 
-const MIN_STROKE_WIDTH = 1;
-const MAX_STROKE_WIDTH = 100;
+const DEFAULT_MIN = 1;
+const DEFAULT_MAX = 100;
 
 export const StrokeWidthInput = ({
   value,
   onChange,
   disabled = false,
+  min = DEFAULT_MIN,
+  max = DEFAULT_MAX,
 }: StrokeWidthInputProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState(value?.toString() ?? "");
-  const lastValidValueRef = useRef<number>(value ?? MIN_STROKE_WIDTH);
+  const lastValidValueRef = useRef<number>(value ?? min);
 
   useEffect(() => {
     if (value !== null) {
@@ -39,7 +43,7 @@ export const StrokeWidthInput = ({
       return;
     }
 
-    const clamped = Math.min(MAX_STROKE_WIDTH, Math.max(MIN_STROKE_WIDTH, parsed));
+    const clamped = Math.min(max, Math.max(min, parsed));
     setInputValue(clamped.toString());
     lastValidValueRef.current = clamped;
     onChange(clamped);
@@ -50,7 +54,7 @@ export const StrokeWidthInput = ({
 
     e.preventDefault();
     const delta = e.deltaY > 0 ? -1 : 1;
-    const newValue = Math.min(MAX_STROKE_WIDTH, Math.max(MIN_STROKE_WIDTH, value + delta));
+    const newValue = Math.min(max, Math.max(min, value + delta));
     onChange(newValue);
   };
 
@@ -62,11 +66,11 @@ export const StrokeWidthInput = ({
       inputRef.current?.blur();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      const newValue = Math.min(MAX_STROKE_WIDTH, value + 1);
+      const newValue = Math.min(max, value + 1);
       onChange(newValue);
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      const newValue = Math.max(MIN_STROKE_WIDTH, value - 1);
+      const newValue = Math.max(min, value - 1);
       onChange(newValue);
     } else if (e.key === KEYS.ESCAPE) {
       setInputValue(lastValidValueRef.current.toString());
