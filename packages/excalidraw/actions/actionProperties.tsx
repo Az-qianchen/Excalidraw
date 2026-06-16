@@ -764,7 +764,7 @@ export const actionChangeOpacity = register<ExcalidrawElement["opacity"]>({
         onChange={updateData}
         min={0}
         max={100}
-        step={10}
+        step={1}
         testId="opacity"
       />
     );
