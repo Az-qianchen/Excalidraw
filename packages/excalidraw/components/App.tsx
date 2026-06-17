@@ -10393,7 +10393,7 @@ class App extends React.Component<AppProps, AppState> {
 
     return newImageElement({
       type: "image",
-      strokeColor: this.state.currentItemStrokeColor,
+      strokeColor: "transparent",
       backgroundColor: this.state.currentItemBackgroundColor,
       fillStyle: this.state.currentItemFillStyle,
       strokeWidth: this.state.currentItemStrokeWidth,
