@@ -2380,20 +2380,16 @@ class App extends React.Component<AppProps, AppState> {
                               if (!maskingElement) {
                                 return null;
                               }
-                              const sidebarOpen =
-                                !!this.state.openSidebar &&
-                                editorJotaiStore.get(isSidebarDockedAtom) &&
-                                this.editorInterface.canFitSidebar;
                               return (
                                 <div
                                   className="excalidraw-canvas-buttons"
                                   style={{
                                     position: "absolute",
-                                    right: sidebarOpen
-                                      ? "calc(var(--right-sidebar-width) + 12px)"
-                                      : "12px",
-                                    top: "50%",
-                                    transform: "translateY(-50%)",
+                                    bottom: "12px",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    flexDirection: "row",
+                                    alignItems: "center",
                                   }}
                                 >
                                   <ToolButton
@@ -2474,20 +2470,16 @@ class App extends React.Component<AppProps, AppState> {
                               if (!mwElement) {
                                 return null;
                               }
-                              const mwSidebarOpen =
-                                !!this.state.openSidebar &&
-                                editorJotaiStore.get(isSidebarDockedAtom) &&
-                                this.editorInterface.canFitSidebar;
                               return (
                                 <div
                                   className="excalidraw-canvas-buttons"
                                   style={{
                                     position: "absolute",
-                                    right: mwSidebarOpen
-                                      ? "calc(var(--right-sidebar-width) + 12px)"
-                                      : "12px",
-                                    top: "50%",
-                                    transform: "translateY(-50%)",
+                                    bottom: "12px",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    flexDirection: "row",
+                                    alignItems: "center",
                                   }}
                                 >
                                   {this.renderMagicWandNumberInput(
@@ -7176,7 +7168,7 @@ class App extends React.Component<AppProps, AppState> {
     max: number,
     onChange: (v: number) => void,
   ) => (
-    <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "2px 4px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "var(--default-button-size)" }}>
       <label style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{label}</label>
       <input
         type="text"
