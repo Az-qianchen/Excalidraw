@@ -8486,6 +8486,10 @@ class App extends React.Component<AppProps, AppState> {
         setCursor(this.interactiveCanvas, CURSOR_TYPE.CROSSHAIR);
         return;
       }
+      if (this.state.magicWandElementId) {
+        setCursor(this.interactiveCanvas, CURSOR_TYPE.CROSSHAIR);
+        return;
+      }
       if (isLaserTool) {
         return;
       }
