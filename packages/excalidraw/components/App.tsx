@@ -9664,9 +9664,7 @@ class App extends React.Component<AppProps, AppState> {
             initialPointerX: pointerDownState.origin.x,
           };
           this.store.scheduleCapture();
-        } else if (
-          !this.state.croppingElementId
-        ) {
+        } else {
           const elementWithTransformHandleType =
             getElementWithTransformHandleType(
               elements,
