@@ -16,10 +16,7 @@ import type { AppState } from "@excalidraw/excalidraw/types";
 
 import type { ExtractSetType } from "@excalidraw/common/utility-types";
 
-import {
-  resetOriginalContainerCache,
-  updateOriginalContainerCache,
-} from "./containerCache";
+import { resetOriginalContainerCache } from "./containerCache";
 import { LinearElementEditor } from "./linearElementEditor";
 
 import { measureText } from "./textMeasurements";
@@ -119,29 +116,6 @@ export const redrawTextBoundingBox = (
   boundTextUpdates.height = metrics.height;
 
   if (container) {
-    const maxContainerHeight = getBoundTextMaxHeight(
-      container,
-      textElement as ExcalidrawTextElementWithContainer,
-    );
-    const maxContainerWidth = getBoundTextMaxWidth(container, textElement);
-
-    if (!isArrowElement(container) && metrics.height > maxContainerHeight) {
-      const nextHeight = computeContainerDimensionForBoundText(
-        metrics.height,
-        container.type,
-      );
-      scene.mutateElement(container, { height: nextHeight });
-      updateOriginalContainerCache(container.id, nextHeight);
-    }
-
-    if (metrics.width > maxContainerWidth) {
-      const nextWidth = computeContainerDimensionForBoundText(
-        metrics.width,
-        container.type,
-      );
-      scene.mutateElement(container, { width: nextWidth });
-    }
-
     const updatedTextElement = {
       ...textElement,
       ...boundTextUpdates,

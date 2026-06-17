@@ -853,7 +853,7 @@ describe("textWysiwyg", () => {
       ]);
     });
 
-    it("should compute the container height correctly and not throw error when height is updated while editing the text", async () => {
+    it("should not resize container when text exceeds while editing", async () => {
       const diamond = API.createElement({
         type: "diamond",
         x: 10,
@@ -878,12 +878,12 @@ describe("textWysiwyg", () => {
         fireEvent.input(editor, { target: { value } }),
       ).not.toThrow();
 
-      expect(diamond.height).toBe(50020);
+      expect(diamond.height).toBe(75);
 
       // Clearing text to simulate height decrease
       expect(() => updateTextEditor(editor, "")).not.toThrow();
 
-      expect(diamond.height).toBe(70);
+      expect(diamond.height).toBe(75);
     });
 
     it("should bind text to container when double clicked inside of the transparent container", async () => {
@@ -1488,9 +1488,8 @@ describe("textWysiwyg", () => {
       expect(container.height).toBe(originalRectHeight);
     });
 
-    it("should reset the container height cache when resizing", async () => {
+    it("should not resize container when resizing with bound text", async () => {
       Keyboard.keyPress(KEYS.ENTER);
-      expect(getOriginalContainerHeightFromCache(rectangle.id)).toBe(75);
       let editor = await getTextEditor();
       updateTextEditor(editor, "Hello");
       Keyboard.exitTextEditor(editor);
@@ -1506,16 +1505,10 @@ describe("textWysiwyg", () => {
 
       Keyboard.exitTextEditor(editor);
       expect(rectangle.height).toBeCloseTo(155, 8);
-      // cache updated again
-      expect(getOriginalContainerHeightFromCache(rectangle.id)).toBeCloseTo(
-        155,
-        8,
-      );
     });
 
-    it("should reset the container height cache when font properties updated", async () => {
+    it("should not resize container when font properties updated", async () => {
       Keyboard.keyPress(KEYS.ENTER);
-      expect(getOriginalContainerHeightFromCache(rectangle.id)).toBe(75);
 
       const editor = await getTextEditor();
       updateTextEditor(editor, "Hello World!");
@@ -1529,18 +1522,16 @@ describe("textWysiwyg", () => {
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontFamily,
       ).toEqual(FONT_FAMILY["Comic Shanns"]);
-      expect(getOriginalContainerHeightFromCache(rectangle.id)).toBe(75);
 
       fireEvent.click(screen.getByTitle(/Very large/i));
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontSize,
       ).toEqual(36);
-      expect(getOriginalContainerHeightFromCache(rectangle.id)).toBe(100);
+      expect(rectangle.height).toBe(75);
     });
 
     it("should update line height when font family updated", async () => {
       Keyboard.keyPress(KEYS.ENTER);
-      expect(getOriginalContainerHeightFromCache(rectangle.id)).toBe(75);
 
       const editor = await getTextEditor();
       updateTextEditor(editor, "Hello World!");

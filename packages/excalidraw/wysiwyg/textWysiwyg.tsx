@@ -14,12 +14,7 @@ import {
 } from "@excalidraw/common";
 import { pointFrom, pointRotateRads, type Radians } from "@excalidraw/math";
 
-import {
-  getTextFromElements,
-  originalContainerCache,
-  updateBoundElements,
-  updateOriginalContainerCache,
-} from "@excalidraw/element";
+import { getTextFromElements } from "@excalidraw/element";
 
 import { LinearElementEditor } from "@excalidraw/element";
 import { bumpVersion } from "@excalidraw/element";
@@ -28,9 +23,7 @@ import {
   getContainerElement,
   getTextElementAngle,
   redrawTextBoundingBox,
-  getBoundTextMaxHeight,
   getBoundTextMaxWidth,
-  computeContainerDimensionForBoundText,
   computeBoundTextPosition,
   getBoundTextElement,
 } from "@excalidraw/element";
@@ -241,26 +234,6 @@ export const textWysiwyg = ({
     y: number;
   } | null = null;
 
-  const textPropertiesUpdated = (
-    updatedTextElement: ExcalidrawTextElement,
-    editable: HTMLTextAreaElement,
-  ) => {
-    if (!editable.style.fontFamily || !editable.style.fontSize) {
-      return false;
-    }
-    const currentFont = editable.style.fontFamily.replace(/"/g, "");
-    if (
-      getFontFamilyString({ fontFamily: updatedTextElement.fontFamily }) !==
-      currentFont
-    ) {
-      return true;
-    }
-    if (`${updatedTextElement.fontSize}px` !== editable.style.fontSize) {
-      return true;
-    }
-    return false;
-  };
-
   let LAST_THEME = app.state.theme;
 
   const updateWysiwygStyle = () => {
@@ -289,7 +262,6 @@ export const textWysiwyg = ({
       let height = updatedTextElement.height;
 
       let maxWidth = updatedTextElement.width;
-      let maxHeight = updatedTextElement.height;
 
       if (container && updatedTextElement.containerId) {
         if (isArrowElement(container)) {
@@ -302,57 +274,10 @@ export const textWysiwyg = ({
           coordX = boundTextCoords.x;
           coordY = boundTextCoords.y;
         }
-        const propertiesUpdated = textPropertiesUpdated(
-          updatedTextElement,
-          editable,
-        );
-
-        let originalContainerData;
-        if (propertiesUpdated) {
-          originalContainerData = updateOriginalContainerCache(
-            container.id,
-            container.height,
-          );
-        } else {
-          originalContainerData = originalContainerCache[container.id];
-          if (!originalContainerData) {
-            originalContainerData = updateOriginalContainerCache(
-              container.id,
-              container.height,
-            );
-          }
-        }
 
         maxWidth = getBoundTextMaxWidth(container, updatedTextElement);
-        maxHeight = getBoundTextMaxHeight(
-          container,
-          updatedTextElement as ExcalidrawTextElementWithContainer,
-        );
 
-        // autogrow container height if text exceeds
-        if (!isArrowElement(container) && height > maxHeight) {
-          const targetContainerHeight = computeContainerDimensionForBoundText(
-            height,
-            container.type,
-          );
-
-          app.scene.mutateElement(container, { height: targetContainerHeight });
-          updateBoundElements(container, app.scene);
-          return;
-        } else if (
-          // autoshrink container height until original container height
-          // is reached when text is removed
-          !isArrowElement(container) &&
-          container.height > originalContainerData.height &&
-          height < maxHeight
-        ) {
-          const targetContainerHeight = computeContainerDimensionForBoundText(
-            height,
-            container.type,
-          );
-          app.scene.mutateElement(container, { height: targetContainerHeight });
-          updateBoundElements(container, app.scene);
-        } else {
+        if (!isArrowElement(container)) {
           const { x, y } = computeBoundTextPosition(
             container,
             updatedTextElement as ExcalidrawTextElementWithContainer,
