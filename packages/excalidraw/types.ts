@@ -456,6 +456,7 @@ export interface AppState {
   offsetLeft: number;
 
   fileHandle: FileSystemFileHandle | null;
+  lastSavedElementsHash: number | null;
   collaborators: Map<SocketId, Collaborator>;
   stats: {
     open: boolean;

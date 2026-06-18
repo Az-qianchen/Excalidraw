@@ -576,6 +576,10 @@
     "unrecognizedLinkFormat": "The link you embedded does not match the expected format. Please try to paste the 'embed' string provided by the source site",
     "elementLinkCopied": "Link copied to clipboard"
   },
+  "saveStatus": {
+    "saved": "Saved",
+    "unsavedChanges": "Unsaved changes"
+  },
   "colors": {
     "transparent": "Transparent",
     "black": "Black",

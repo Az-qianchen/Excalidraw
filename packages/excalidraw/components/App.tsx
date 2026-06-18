@@ -6109,6 +6109,7 @@ class App extends React.Component<AppProps, AppState> {
   public getName = () => {
     return (
       this.state.name ||
+      this.state.fileHandle?.name?.replace(/\.excalidraw$/, "") ||
       this.props.name ||
       `${t("labels.untitled")}-${getDateTime()}`
     );

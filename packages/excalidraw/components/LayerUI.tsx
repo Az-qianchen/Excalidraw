@@ -36,6 +36,7 @@ import { LoadingMessage } from "./LoadingMessage";
 import { LockButton } from "./LockButton";
 import { MobileMenu } from "./MobileMenu";
 import { PasteChartDialog } from "./PasteChartDialog";
+import { SaveStatus } from "./SaveStatus";
 import { Section } from "./Section";
 import Stack from "./Stack";
 import { UserList } from "./UserList";
@@ -303,7 +304,10 @@ const LayerUI = ({
             gap={spacing.menuTopGap}
             className={clsx("App-menu_top__left")}
           >
-            {renderCanvasActions()}
+            <Stack.Row gap={2} align="center">
+              {renderCanvasActions()}
+              <SaveStatus />
+            </Stack.Row>
             <div
               className={clsx("selected-shape-actions-container", {
                 "selected-shape-actions-container--compact":

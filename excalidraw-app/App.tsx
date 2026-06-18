@@ -36,6 +36,7 @@ import {
 import polyfill from "@excalidraw/excalidraw/polyfill";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
+import { loadFileHandleFromIDB } from "@excalidraw/excalidraw/data/filesystem";
 import { t } from "@excalidraw/excalidraw/i18n";
 
 import {
@@ -528,6 +529,13 @@ const ExcalidrawWrapper = () => {
     initializeScene({ collabAPI, excalidrawAPI }).then(async (data) => {
       loadImages(data, /* isInitialLoad */ true);
       initialStatePromiseRef.current.promise.resolve(data.scene);
+
+      const fileHandle = await loadFileHandleFromIDB();
+      if (fileHandle) {
+        excalidrawAPI.updateScene({
+          appState: { fileHandle },
+        });
+      }
     });
 
     const onHashChange = async (event: HashChangeEvent) => {
@@ -570,6 +578,11 @@ const ExcalidrawWrapper = () => {
           const localDataState = importFromLocalStorage();
           const username = importUsernameFromLocalStorage();
           setLangCode(getPreferredLanguage());
+          if (localDataState.appState) {
+            const { fileHandle: _fileHandle, ...restAppState } =
+              localDataState.appState;
+            localDataState.appState = restAppState as typeof localDataState.appState;
+          }
           excalidrawAPI.updateScene({
             ...localDataState,
             captureUpdate: CaptureUpdateAction.NEVER,

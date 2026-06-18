@@ -1,0 +1,50 @@
+.excalidraw {
+  .SaveStatus {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-md);
+    white-space: nowrap;
+    max-width: 220px;
+    cursor: pointer;
+    user-select: none;
+    pointer-events: var(--ui-pointerEvents);
+    font-family: var(--ui-font);
+    line-height: 1;
+
+    &:hover {
+      background-color: var(--button-hover-bg);
+    }
+
+    &__indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+
+      &--pulse {
+        animation: SaveStatus-pulse 2s ease-in-out infinite;
+      }
+    }
+
+    &__label {
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    &__name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 400;
+      opacity: 0.6;
+      font-size: 0.6875rem;
+      color: var(--text-primary-color);
+    }
+  }
+}
+
+@keyframes SaveStatus-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

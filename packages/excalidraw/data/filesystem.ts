@@ -72,4 +72,88 @@ export const fileSave = (
   );
 };
 
+const IDB_NAME = "excalidraw";
+const IDB_STORE = "fileHandles";
+const IDB_KEY = "activeFileHandle";
+
+const openIDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(IDB_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const saveFileHandleToIDB = async (
+  handle: FileSystemFileHandle | null,
+): Promise<void> => {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    const store = tx.objectStore(IDB_STORE);
+    if (handle) {
+      store.put(handle, IDB_KEY);
+    } else {
+      store.delete(IDB_KEY);
+    }
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (e) {
+    console.warn("Failed to save file handle to IndexedDB", e);
+  }
+};
+
+export const loadFileHandleFromIDB =
+  async (): Promise<FileSystemFileHandle | null> => {
+    try {
+      const db = await openIDB();
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const store = tx.objectStore(IDB_STORE);
+      const request = store.get(IDB_KEY);
+      const handle: FileSystemFileHandle | undefined = await new Promise(
+        (resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        },
+      );
+      db.close();
+      return handle ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+interface FileSystemFileHandleWithPermission extends FileSystemFileHandle {
+  queryPermission(descriptor: {
+    mode: "read" | "readwrite";
+  }): Promise<PermissionState>;
+  requestPermission(descriptor: {
+    mode: "read" | "readwrite";
+  }): Promise<PermissionState>;
+}
+
+export const ensureFileHandlePermission = async (
+  handle: FileSystemFileHandle,
+): Promise<boolean> => {
+  try {
+    const handleWithPermission =
+      handle as FileSystemFileHandleWithPermission;
+    const descriptor = { mode: "readwrite" as const };
+    let permission = await handleWithPermission.queryPermission(descriptor);
+    if (permission === "granted") {
+      return true;
+    }
+    permission = await handleWithPermission.requestPermission(descriptor);
+    return permission === "granted";
+  } catch {
+    return false;
+  }
+};
+
 export { nativeFileSystemSupported };

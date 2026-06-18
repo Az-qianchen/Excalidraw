@@ -12,6 +12,7 @@ import { MobileToolBar } from "./MobileToolBar";
 import { FixedSideContainer } from "./FixedSideContainer";
 
 import { Island } from "./Island";
+import { SaveStatus } from "./SaveStatus";
 
 import { PenModeButton } from "./PenModeButton";
 
@@ -97,6 +98,7 @@ export const MobileMenu = ({
       <div className="excalidraw-ui-top-left">
         {renderTopLeftUI?.(true, appState)}
         <MainMenuTunnel.Out />
+        <SaveStatus />
       </div>
     );
 
