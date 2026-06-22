@@ -24,7 +24,7 @@ export const SHAPES = [
     key: KEYS.H,
     numericKey: null,
     fillable: false,
-    toolbar: true,
+    toolbar: false,
   },
   {
     icon: SelectionIcon,
@@ -96,7 +96,7 @@ export const SHAPES = [
     key: null,
     numericKey: KEYS["9"],
     fillable: false,
-    toolbar: true,
+    toolbar: false,
   },
   {
     icon: EraserIcon,
@@ -104,7 +104,7 @@ export const SHAPES = [
     key: KEYS.E,
     numericKey: KEYS["0"],
     fillable: false,
-    toolbar: true,
+    toolbar: false,
   },
   {
     icon: laserPointerToolIcon,

@@ -82,6 +82,9 @@ import {
   DotsHorizontalIcon,
   SelectionIcon,
   pencilIcon,
+  handIcon,
+  ImageIcon,
+  EraserIcon,
 } from "./icons";
 
 import { Island } from "./Island";
@@ -1145,6 +1148,9 @@ export const ShapesSwitcher = ({
 
   const frameToolSelected = activeTool.type === "frame";
   const laserToolSelected = activeTool.type === "laser";
+  const handToolSelected = activeTool.type === "hand";
+  const imageToolSelected = activeTool.type === "image";
+  const eraserToolSelected = activeTool.type === "eraser";
   const lassoToolSelected =
     isFullStylesPanel &&
     activeTool.type === "lasso" &&
@@ -1176,8 +1182,7 @@ export const ShapesSwitcher = ({
           const shortcut = letter
             ? `${letter} ${t("helpDialog.or")} ${numericKey}`
             : `${numericKey}`;
-          const keybindingLabel =
-            value === "hand" ? undefined : numericKey || letter;
+          const keybindingLabel = numericKey || letter;
 
           // when in compact styles panel mode (tablet)
           // use a ToolPopover for selection/lasso toggle as well
@@ -1244,13 +1249,7 @@ export const ShapesSwitcher = ({
                 if (app.state.activeTool.type !== value) {
                   trackEvent("toolbar", value, "ui");
                 }
-                if (value === "image") {
-                  app.setActiveTool({
-                    type: value,
-                  });
-                } else {
-                  app.setActiveTool({ type: value });
-                }
+                app.setActiveTool({ type: value });
               }}
             />
           );
@@ -1265,6 +1264,9 @@ export const ShapesSwitcher = ({
               frameToolSelected ||
               embeddableToolSelected ||
               lassoToolSelected ||
+              handToolSelected ||
+              imageToolSelected ||
+              eraserToolSelected ||
               // in collab we're already highlighting the laser button
               // outside toolbar, so let's not highlight extra-tools button
               // on top of it
@@ -1284,6 +1286,12 @@ export const ShapesSwitcher = ({
             ? laserPointerToolIcon
             : lassoToolSelected
             ? LassoIcon
+            : handToolSelected
+            ? handIcon
+            : imageToolSelected
+            ? ImageIcon
+            : eraserToolSelected
+            ? EraserIcon
             : extraToolsIcon}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content
@@ -1291,6 +1299,33 @@ export const ShapesSwitcher = ({
           onSelect={() => setIsExtraToolsMenuOpen(false)}
           className="App-toolbar__extra-tools-dropdown"
         >
+          <DropdownMenu.Item
+            onSelect={() => app.setActiveTool({ type: "hand" })}
+            icon={handIcon}
+            data-testid="toolbar-hand"
+            selected={handToolSelected}
+            shortcut={KEYS.H.toLocaleUpperCase()}
+          >
+            {t("toolBar.hand")}
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() => app.setActiveTool({ type: "image" })}
+            icon={ImageIcon}
+            data-testid="toolbar-image"
+            selected={imageToolSelected}
+            shortcut={KEYS["9"].toString()}
+          >
+            {t("toolBar.image")}
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() => app.setActiveTool({ type: "eraser" })}
+            icon={EraserIcon}
+            data-testid="toolbar-eraser"
+            selected={eraserToolSelected}
+            shortcut={KEYS.E.toLocaleUpperCase()}
+          >
+            {t("toolBar.eraser")}
+          </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={() => app.setActiveTool({ type: "frame" })}
             icon={frameToolIcon}
