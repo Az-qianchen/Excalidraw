@@ -40,6 +40,7 @@ import { SaveStatus } from "./SaveStatus";
 import { Section } from "./Section";
 import Stack from "./Stack";
 import { UserList } from "./UserList";
+import { GridSettings } from "./GridSettings";
 import { PenModeButton } from "./PenModeButton";
 import Footer from "./footer/Footer";
 import { isSidebarDockedAtom } from "./Sidebar/Sidebar";
@@ -347,6 +348,11 @@ const LayerUI = ({
                           />
                           {heading}
                           <Stack.Row gap={spacing.toolbarInnerRowGap}>
+                            <GridSettings
+                              app={app}
+                              appState={appState}
+                              setAppState={setAppState}
+                            />
                             <PenModeButton
                               zenModeEnabled={appState.zenModeEnabled}
                               checked={appState.penMode}

@@ -108,6 +108,8 @@
     "ungroup": "Ungroup selection",
     "collaborators": "Collaborators",
     "toggleGrid": "Toggle grid",
+    "gridSize": "Grid size",
+    "gridStep": "Grid step",
     "addToLibrary": "Add to library",
     "removeFromLibrary": "Remove from library",
     "libraryLoadingMessage": "Loading library…",

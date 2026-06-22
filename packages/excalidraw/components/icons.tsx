@@ -2293,7 +2293,7 @@ export const youtubeIcon = createIcon(
 );
 
 export const gridIcon = createIcon(
-  <g strokeWidth={1.5}>
+  <g strokeWidth={1.25}>
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path d="M3 6h18" />
     <path d="M3 12h18" />

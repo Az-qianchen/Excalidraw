@@ -97,6 +97,8 @@
     "ungroup": "解除编组",
     "collaborators": "协作者",
     "toggleGrid": "切换网格显示",
+    "gridSize": "网格大小",
+    "gridStep": "粗线间隔",
     "addToLibrary": "添加到素材库中",
     "removeFromLibrary": "从素材库中移除",
     "libraryLoadingMessage": "正在加载素材库…",
