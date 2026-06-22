@@ -1,9 +1,8 @@
 import { useState } from "react";
 
 import { getNormalizedGridSize, getNormalizedGridStep } from "../scene";
-import { isGridModeEnabled } from "../snapping";
 import { t } from "../i18n";
-import { checkIcon, emptyIcon, gridIcon } from "./icons";
+import { gridIcon } from "./icons";
 import { ToolButton } from "./ToolButton";
 import { Popover } from "radix-ui";
 import { PropertiesPopover } from "./PropertiesPopover";
@@ -25,7 +24,6 @@ export const GridSettings = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { container } = useExcalidrawContainer();
-  const gridEnabled = isGridModeEnabled(app);
 
   return (
     <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
@@ -47,51 +45,33 @@ export const GridSettings = ({
           onClose={() => setIsOpen(false)}
         >
           <div className="selected-shape-actions">
-            <button
-              type="button"
-              className="grid-settings__toggle"
-              onClick={() => {
-                setAppState({
-                  gridModeEnabled: !gridEnabled,
-                  objectsSnapModeEnabled: false,
-                });
-              }}
-            >
-              <span className="grid-settings__check-icon">
-                {gridEnabled ? checkIcon : emptyIcon}
-              </span>
-              {t("labels.toggleGrid")}
-            </button>
+            <div className="grid-settings__field">
+              <label className="grid-settings__label">
+                {t("labels.gridSize")}
+              </label>
+              <StrokeWidthInput
+                value={appState.gridSize}
+                min={1}
+                max={500}
+                onChange={(val) => {
+                  setAppState({ gridSize: getNormalizedGridSize(val) });
+                }}
+              />
+            </div>
 
-            <fieldset disabled={!gridEnabled}>
-              <div className="grid-settings__field">
-                <label className="grid-settings__label">
-                  {t("labels.gridSize")}
-                </label>
-                <StrokeWidthInput
-                  value={appState.gridSize}
-                  min={1}
-                  max={500}
-                  onChange={(val) => {
-                    setAppState({ gridSize: getNormalizedGridSize(val) });
-                  }}
-                />
-              </div>
-
-              <div className="grid-settings__field">
-                <label className="grid-settings__label">
-                  {t("labels.gridStep")}
-                </label>
-                <StrokeWidthInput
-                  value={appState.gridStep}
-                  min={1}
-                  max={100}
-                  onChange={(val) => {
-                    setAppState({ gridStep: getNormalizedGridStep(val) });
-                  }}
-                />
-              </div>
-            </fieldset>
+            <div className="grid-settings__field">
+              <label className="grid-settings__label">
+                {t("labels.gridStep")}
+              </label>
+              <StrokeWidthInput
+                value={appState.gridStep}
+                min={1}
+                max={100}
+                onChange={(val) => {
+                  setAppState({ gridStep: getNormalizedGridStep(val) });
+                }}
+              />
+            </div>
           </div>
         </PropertiesPopover>
       )}
