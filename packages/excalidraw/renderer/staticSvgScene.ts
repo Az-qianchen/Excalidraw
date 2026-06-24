@@ -5,6 +5,7 @@ import {
   THEME,
   DARK_THEME_FILTER,
   getFontFamilyString,
+  getFontString,
   isRTL,
   isTestEnv,
   getVerticalOffset,
@@ -19,7 +20,7 @@ import {
   getEmbedLink,
 } from "@excalidraw/element";
 import { LinearElementEditor } from "@excalidraw/element";
-import { getBoundTextElement, getContainerElement } from "@excalidraw/element";
+import { getBoundTextElement, getContainerElement, getBoundTextMaxWidth } from "@excalidraw/element";
 import { getLineHeightInPx } from "@excalidraw/element";
 import {
   isArrowElement,
@@ -700,7 +701,18 @@ const renderElementToSvg = (
             : "start";
 
         if (element.spans && element.spans.length > 0) {
-          const spanLines = splitSpansIntoLines(element.spans);
+          const spanContainer = getContainerElement(element, elementsMap);
+          const spanMaxWidth = spanContainer
+            ? getBoundTextMaxWidth(spanContainer, element)
+            : element.autoResize
+            ? Infinity
+            : element.width;
+          const spanLines = splitSpansIntoLines(
+            element.spans,
+            element.originalText,
+            getFontString(element),
+            spanMaxWidth,
+          );
           for (let i = 0; i < spanLines.length; i++) {
             const textEl = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
             textEl.setAttribute("x", `${horizontalOffset}`);

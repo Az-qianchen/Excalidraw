@@ -20,7 +20,7 @@ import { resetOriginalContainerCache } from "./containerCache";
 import { LinearElementEditor } from "./linearElementEditor";
 
 import { measureText } from "./textMeasurements";
-import { wrapText } from "./textWrapping";
+import { getWrappedTextLines, wrapText } from "./textWrapping";
 import {
   isBoundToContainer,
   isArrowElement,
@@ -37,15 +37,83 @@ import type {
   ExcalidrawTextContainer,
   ExcalidrawTextElement,
   ExcalidrawTextElementWithContainer,
+  FontString,
   NonDeletedExcalidrawElement,
   TextSpan,
 } from "./types";
 
 /**
- * 根据 span 文本中的换行符将 TextSpan 数组拆分为多行。
- * 每一行是一个 TextSpan 数组。
+ * 将 TextSpan 数组按可视行拆分。
+ *
+ * 当提供 `originalText`/`font`/`maxWidth` 时，使用 `getWrappedTextLines`
+ * 计算软换行，使 span 渲染与 textarea 的 `pre-wrap` 行为一致；
+ * `maxWidth` 为 `Infinity` 时退化为仅按硬换行符拆分（用于不换行的文本）。
+ *
+ * span 的文本拼接应等于 `originalText`；若不一致（span 已过期），
+ * 回退到按 `\n` 拆分以避免越界/错位。
  */
-export const splitSpansIntoLines = (spans: readonly TextSpan[]): TextSpan[][] => {
+export const splitSpansIntoLines = (
+  spans: readonly TextSpan[],
+  originalText?: string,
+  font?: FontString,
+  maxWidth: number = Infinity,
+): TextSpan[][] => {
+  if (
+    originalText === undefined ||
+    font === undefined ||
+    !Number.isFinite(maxWidth)
+  ) {
+    return splitSpansByHardLineBreaks(spans);
+  }
+
+  const spansTotal = spans.reduce((n, s) => n + s.text.length, 0);
+  if (spansTotal !== originalText.length) {
+    return splitSpansByHardLineBreaks(spans);
+  }
+
+  const wrappedLines = getWrappedTextLines(originalText, font, maxWidth);
+  const spanRanges: {
+    start: number;
+    end: number;
+    text: string;
+    color?: string;
+  }[] = [];
+  let offset = 0;
+  for (const span of spans) {
+    spanRanges.push({
+      start: offset,
+      end: offset + span.text.length,
+      text: span.text,
+      color: span.color,
+    });
+    offset += span.text.length;
+  }
+
+  const result: TextSpan[][] = wrappedLines.map(() => []);
+  for (let li = 0; li < wrappedLines.length; li++) {
+    const lineStart = wrappedLines[li].start;
+    const lineEnd = wrappedLines[li].end;
+    for (const span of spanRanges) {
+      if (span.end <= lineStart) {
+        continue;
+      }
+      if (span.start >= lineEnd) {
+        break;
+      }
+      const cutStart = Math.max(span.start, lineStart);
+      const cutEnd = Math.min(span.end, lineEnd);
+      const text = span.text.slice(cutStart - span.start, cutEnd - span.start);
+      if (text) {
+        result[li].push({ text, color: span.color });
+      }
+    }
+  }
+  return result;
+};
+
+const splitSpansByHardLineBreaks = (
+  spans: readonly TextSpan[],
+): TextSpan[][] => {
   const lines: TextSpan[][] = [[]];
   for (const span of spans) {
     const parts = span.text.split("\n");

@@ -57,9 +57,7 @@ export const applyColorToSpans = (
   end: number,
   color: string,
 ): TextSpan[] => {
-  const baseSpans = spans && spans.length > 0
-    ? [...spans]
-    : [{ text }];
+  const baseSpans = spans && spans.length > 0 ? [...spans] : [{ text }];
 
   const result: TextSpan[] = [];
   let offset = 0;
@@ -73,15 +71,30 @@ export const applyColorToSpans = (
     } else if (spanStart >= start && spanEnd <= end) {
       result.push({ ...span, color });
     } else if (spanStart < start && spanEnd > end) {
-      result.push({ text: span.text.slice(0, start - spanStart), color: span.color });
-      result.push({ text: span.text.slice(start - spanStart, end - spanStart), color });
-      result.push({ text: span.text.slice(end - spanStart), color: span.color });
+      result.push({
+        text: span.text.slice(0, start - spanStart),
+        color: span.color,
+      });
+      result.push({
+        text: span.text.slice(start - spanStart, end - spanStart),
+        color,
+      });
+      result.push({
+        text: span.text.slice(end - spanStart),
+        color: span.color,
+      });
     } else if (spanStart < start) {
-      result.push({ text: span.text.slice(0, start - spanStart), color: span.color });
+      result.push({
+        text: span.text.slice(0, start - spanStart),
+        color: span.color,
+      });
       result.push({ text: span.text.slice(start - spanStart), color });
     } else {
       result.push({ text: span.text.slice(0, end - spanStart), color });
-      result.push({ text: span.text.slice(end - spanStart), color: span.color });
+      result.push({
+        text: span.text.slice(end - spanStart),
+        color: span.color,
+      });
     }
 
     offset = spanEnd;
@@ -92,8 +105,12 @@ export const applyColorToSpans = (
 
 /**
  * 文本内容变化时更新 span 数组。
+ *
  * 通过比较新旧文本的差异，保留未受影响部分的格式，
  * 新插入的文本继承光标位置处的颜色。
+ *
+ * 优先用光标位置定位编辑区域（对含重复字符的纯删除/插入场景
+ * 能正确归属颜色）；若光标定位无法验证，回退到最长公共前后缀。
  */
 export const updateSpansOnTextChange = (
   oldText: string,
@@ -109,30 +126,71 @@ export const updateSpansOnTextChange = (
     return [...spans];
   }
 
-  let prefixLen = 0;
-  const minLen = Math.min(oldText.length, newText.length);
-  while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
-    prefixLen++;
-  }
+  const oldLen = oldText.length;
+  const newLen = newText.length;
 
-  let suffixLen = 0;
-  while (
-    suffixLen < (minLen - prefixLen) &&
-    oldText[oldText.length - 1 - suffixLen] === newText[newText.length - 1 - suffixLen]
-  ) {
-    suffixLen++;
+  const computePrefixSuffix = (): [number, number] => {
+    let prefixLen = 0;
+    const minLen = Math.min(oldLen, newLen);
+    while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
+      prefixLen++;
+    }
+    let suffixLen = 0;
+    while (
+      suffixLen < minLen - prefixLen &&
+      oldText[oldLen - 1 - suffixLen] === newText[newLen - 1 - suffixLen]
+    ) {
+      suffixLen++;
+    }
+    return [prefixLen, suffixLen];
+  };
+
+  let prefixLen: number;
+  let suffixLen: number;
+
+  if (oldLen > newLen) {
+    // 净删除：删除区域在 oldText [delStart, delStart + deletedLen)
+    const deletedLen = oldLen - newLen;
+    const delStart = Math.max(0, Math.min(cursorPosition, oldLen - deletedLen));
+    if (
+      oldText.slice(0, delStart) + oldText.slice(delStart + deletedLen) ===
+      newText
+    ) {
+      prefixLen = delStart;
+      suffixLen = oldLen - delStart - deletedLen;
+    } else {
+      [prefixLen, suffixLen] = computePrefixSuffix();
+    }
+  } else if (newLen > oldLen) {
+    // 净插入：插入区域在 newText [insStart, insStart + insertedLen)
+    const insertedLen = newLen - oldLen;
+    const insStart = Math.max(
+      0,
+      Math.min(cursorPosition, newLen) - insertedLen,
+    );
+    if (
+      newText.slice(0, insStart) + newText.slice(insStart + insertedLen) ===
+      oldText
+    ) {
+      prefixLen = insStart;
+      suffixLen = oldLen - insStart;
+    } else {
+      [prefixLen, suffixLen] = computePrefixSuffix();
+    }
+  } else {
+    [prefixLen, suffixLen] = computePrefixSuffix();
   }
 
   const getColorAt = (pos: number): string | undefined => {
     let offset = 0;
-    for (const span of spans) {
+    for (const span of spans!) {
       if (pos >= offset && pos < offset + span.text.length) {
         return span.color;
       }
       offset += span.text.length;
     }
-    if (spans.length > 0) {
-      return spans[spans.length - 1].color;
+    if (spans!.length > 0) {
+      return spans![spans!.length - 1].color;
     }
     return undefined;
   };
@@ -143,17 +201,22 @@ export const updateSpansOnTextChange = (
     let offset = 0;
     for (const span of spans) {
       const spanEnd = offset + span.text.length;
-      if (offset >= prefixLen) break;
+      if (offset >= prefixLen) {
+        break;
+      }
       if (spanEnd <= prefixLen) {
         result.push({ ...span });
       } else {
-        result.push({ text: span.text.slice(0, prefixLen - offset), color: span.color });
+        result.push({
+          text: span.text.slice(0, prefixLen - offset),
+          color: span.color,
+        });
       }
       offset = spanEnd;
     }
   }
 
-  const insertedLen = newText.length - prefixLen - suffixLen;
+  const insertedLen = newLen - prefixLen - suffixLen;
   if (insertedLen > 0) {
     const insertedText = newText.slice(prefixLen, prefixLen + insertedLen);
     const color = getColorAt(Math.max(0, prefixLen - 1));
@@ -161,7 +224,7 @@ export const updateSpansOnTextChange = (
   }
 
   if (suffixLen > 0) {
-    const suffixStart = oldText.length - suffixLen;
+    const suffixStart = oldLen - suffixLen;
     let offset = 0;
     for (const span of spans) {
       const spanEnd = offset + span.text.length;
@@ -172,15 +235,18 @@ export const updateSpansOnTextChange = (
       if (offset >= suffixStart) {
         result.push({ ...span });
       } else {
-        result.push({ text: span.text.slice(suffixStart - offset), color: span.color });
+        result.push({
+          text: span.text.slice(suffixStart - offset),
+          color: span.color,
+        });
       }
       offset = spanEnd;
     }
   }
 
-  const merged = mergeAdjacentSpans(result.filter(s => s.text.length > 0));
+  const merged = mergeAdjacentSpans(result.filter((s) => s.text.length > 0));
 
-  const totalText = merged.map(s => s.text).join("");
+  const totalText = merged.map((s) => s.text).join("");
   if (totalText !== newText) {
     return [{ text: newText }];
   }

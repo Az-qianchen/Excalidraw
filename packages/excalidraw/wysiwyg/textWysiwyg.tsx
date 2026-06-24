@@ -602,6 +602,24 @@ export const textWysiwyg = ({
     });
     editable.addEventListener("compositionend", () => {
       isComposing = false;
+      // 组合输入确认后同步更新 spans，否则 previousText 推进但
+      // spans 仍停留在组合前，后续按键会让 diff 基于 spans 错位。
+      const updatedElement = app.scene.getElement<ExcalidrawTextElement>(id);
+      if (
+        updatedElement &&
+        isTextElement(updatedElement) &&
+        updatedElement.spans
+      ) {
+        const newSpans = updateSpansOnTextChange(
+          previousText,
+          editable.value,
+          updatedElement.spans,
+          editable.selectionEnd,
+        );
+        if (newSpans) {
+          app.scene.mutateElement(updatedElement, { spans: newSpans });
+        }
+      }
       previousText = editable.value;
     });
 

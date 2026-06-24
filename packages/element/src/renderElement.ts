@@ -66,7 +66,15 @@ import {
 import { getContainingFrame } from "./frame";
 import { getCornerRadius } from "./utils";
 
-import { ShapeCache, generateRoughOptions, getDashArrayDashed, getDashArrayDotted } from "./shape";
+import {
+  ShapeCache,
+  generateRoughOptions,
+  getDashArrayDashed,
+  getDashArrayDotted,
+} from "./shape";
+
+import { DEFAULT_IMAGE_HSLA } from "./types";
+import { splitSpansIntoLines } from "./textElement";
 
 import type {
   ExcalidrawElement,
@@ -80,8 +88,6 @@ import type {
   ElementsMap,
   ImageHSLA,
 } from "./types";
-import { DEFAULT_IMAGE_HSLA } from "./types";
-import { splitSpansIntoLines } from "./textElement";
 
 import type { RoughCanvas } from "roughjs/bin/canvas";
 
@@ -257,7 +263,7 @@ const generateElementCanvas = (
 
   const rc = rough.canvas(canvas);
 
-  drawElementOnCanvas(element, rc, context, renderConfig);
+  drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
 
   context.restore();
 
@@ -339,7 +345,7 @@ const generateElementCanvas = (
     boundTextCanvas,
     angle: element.angle,
     imageCrop: isImageElement(element) ? element.crop : null,
-    imageHSLA: isImageElement(element) ? (element.imageHSLA ?? null) : null,
+    imageHSLA: isImageElement(element) ? element.imageHSLA ?? null : null,
   };
 };
 
@@ -394,6 +400,7 @@ const drawElementOnCanvas = (
   rc: RoughCanvas,
   context: CanvasRenderingContext2D,
   renderConfig: StaticCanvasRenderConfig,
+  elementsMap: ElementsMap,
 ) => {
   switch (element.type) {
     case "rectangle":
@@ -513,9 +520,7 @@ const drawElementOnCanvas = (
             }
 
             tempContext.putImageData(imageData, 0, 0);
-            const userFilter = buildImageHSLAFilterString(
-              element.imageHSLA,
-            );
+            const userFilter = buildImageHSLAFilterString(element.imageHSLA);
             if (userFilter) {
               context.filter = userFilter;
             }
@@ -532,9 +537,7 @@ const drawElementOnCanvas = (
             );
           }
         } else {
-          const userFilter = buildImageHSLAFilterString(
-            element.imageHSLA,
-          );
+          const userFilter = buildImageHSLAFilterString(element.imageHSLA);
           const combinedFilter = [
             shouldInvertImage ? DARK_THEME_FILTER : "",
             userFilter,
@@ -563,10 +566,7 @@ const drawElementOnCanvas = (
       context.restore();
 
       // 绘制图片描边
-      if (
-        element.strokeColor !== "transparent" &&
-        element.strokeWidth > 0
-      ) {
+      if (element.strokeColor !== "transparent" && element.strokeWidth > 0) {
         context.save();
         context.lineJoin = "round";
         context.lineCap = "round";
@@ -616,7 +616,18 @@ const drawElementOnCanvas = (
         );
 
         if (element.spans && element.spans.length > 0) {
-          const spanLines = splitSpansIntoLines(element.spans);
+          const spanContainer = getContainerElement(element, elementsMap);
+          const spanMaxWidth = spanContainer
+            ? getBoundTextMaxWidth(spanContainer, element)
+            : element.autoResize
+            ? Infinity
+            : element.width;
+          const spanLines = splitSpansIntoLines(
+            element.spans,
+            element.originalText,
+            getFontString(element),
+            spanMaxWidth,
+          );
           for (let lineIndex = 0; lineIndex < spanLines.length; lineIndex++) {
             const y = lineIndex * lineHeightPx + verticalOffset;
             const lineSpans = spanLines[lineIndex];
@@ -624,9 +635,13 @@ const drawElementOnCanvas = (
             // 多 span 渲染时始终从左到右绘制，
             // 因此根据对齐方式计算正确的起始 x 坐标。
             let x = horizontalOffset;
-            if (element.textAlign === "center" || element.textAlign === "right") {
+            if (
+              element.textAlign === "center" ||
+              element.textAlign === "right"
+            ) {
               const lineWidth = lineSpans.reduce(
-                (w, span) => w + context.measureText(span.text).width, 0,
+                (w, span) => w + context.measureText(span.text).width,
+                0,
               );
               if (element.textAlign === "center") {
                 x = (element.width - lineWidth) / 2;
@@ -845,9 +860,7 @@ export const renderSelectionElement = (
 };
 
 /** 将 HSLA 参数转换为 CSS filter 字符串 */
-export const buildImageHSLAFilterString = (
-  imageHSLA?: ImageHSLA,
-): string => {
+export const buildImageHSLAFilterString = (imageHSLA?: ImageHSLA): string => {
   if (!imageHSLA) {
     return "";
   }
@@ -944,7 +957,7 @@ export const renderElement = (
         context.translate(cx, cy);
         context.rotate(element.angle);
         context.translate(-shiftX, -shiftY);
-        drawElementOnCanvas(element, rc, context, renderConfig);
+        drawElementOnCanvas(element, rc, context, renderConfig, allElementsMap);
         context.restore();
       } else {
         const elementWithCanvas = generateElementWithCanvas(
@@ -1030,7 +1043,13 @@ export const renderElement = (
 
           tempCanvasContext.translate(-shiftX, -shiftY);
 
-          drawElementOnCanvas(element, tempRc, tempCanvasContext, renderConfig);
+          drawElementOnCanvas(
+            element,
+            tempRc,
+            tempCanvasContext,
+            renderConfig,
+            allElementsMap,
+          );
 
           tempCanvasContext.translate(shiftX, shiftY);
 
@@ -1069,7 +1088,13 @@ export const renderElement = (
           }
 
           context.translate(-shiftX, -shiftY);
-          drawElementOnCanvas(element, rc, context, renderConfig);
+          drawElementOnCanvas(
+            element,
+            rc,
+            context,
+            renderConfig,
+            allElementsMap,
+          );
         }
 
         context.restore();
