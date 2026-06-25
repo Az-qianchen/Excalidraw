@@ -49,8 +49,12 @@ import type {
  * 计算软换行，使 span 渲染与 textarea 的 `pre-wrap` 行为一致；
  * `maxWidth` 为 `Infinity` 时退化为仅按硬换行符拆分（用于不换行的文本）。
  *
- * span 的文本拼接应等于 `originalText`；若不一致（span 已过期），
- * 回退到按 `\n` 拆分以避免越界/错位。
+ * span 的文本拼接应等于 `originalText`；若不一致（span 已过期，例如
+ * IME 组合输入期间 originalText 已含拼音字符而 spans 尚未同步），不能
+ * 退化为仅按硬换行拆分——那样会丢失软换行让整段挤成一行、且拼音字符
+ * 不会被绘制。改为以 `originalText` 作为软换行布局来源，并把 spans 临时
+ * 对齐到 `originalText`（多出的拼音字符继承相邻 span 颜色），让组合输入
+ * 预览期间仍沿用既有换行形式且拼音可见。
  */
 export const splitSpansIntoLines = (
   spans: readonly TextSpan[],
@@ -67,9 +71,10 @@ export const splitSpansIntoLines = (
   }
 
   const spansTotal = spans.reduce((n, s) => n + s.text.length, 0);
-  if (spansTotal !== originalText.length) {
-    return splitSpansByHardLineBreaks(spans);
-  }
+  const effectiveSpans =
+    spansTotal === originalText.length
+      ? spans
+      : reconcileSpansForRendering(spans, originalText);
 
   const wrappedLines = getWrappedTextLines(originalText, font, maxWidth);
   const spanRanges: {
@@ -79,7 +84,7 @@ export const splitSpansIntoLines = (
     color?: string;
   }[] = [];
   let offset = 0;
-  for (const span of spans) {
+  for (const span of effectiveSpans) {
     spanRanges.push({
       start: offset,
       end: offset + span.text.length,
@@ -127,6 +132,116 @@ const splitSpansByHardLineBreaks = (
     }
   }
   return lines;
+};
+
+/**
+ * 生成一组与 `originalText` 对齐的临时 spans，仅供渲染使用。
+ *
+ * 在 `spans` 拼接文本与 `originalText` 长度/内容不一致时（典型场景：
+ * IME 组合输入期间 `originalText` 已含拼音字符而 spans 尚未在
+ * `compositionend` 同步），用最长公共前缀/后缀定位差异段：
+ * - 前缀、后缀沿用原 spans 的颜色
+ * - 差异段（多出的拼音/被替换的字符）继承前一个 span 的颜色，
+ *   没有前一个 span 则置空（渲染层会用元素默认色绘制）
+ *
+ * 这只是渲染端的临时对齐，不会回写到元素；`compositionend` 时
+ * `updateSpansOnTextChange` 仍会做正式的 spans 同步。
+ */
+const reconcileSpansForRendering = (
+  spans: readonly TextSpan[],
+  originalText: string,
+): readonly TextSpan[] => {
+  if (spans.length === 0) {
+    return [{ text: originalText, color: "" }];
+  }
+
+  const spansText = spans.map((s) => s.text).join("");
+  if (spansText === originalText) {
+    return spans;
+  }
+
+  const minLen = Math.min(spansText.length, originalText.length);
+  let prefixLen = 0;
+  while (
+    prefixLen < minLen &&
+    spansText[prefixLen] === originalText[prefixLen]
+  ) {
+    prefixLen++;
+  }
+  let suffixLen = 0;
+  while (
+    suffixLen < minLen - prefixLen &&
+    spansText[spansText.length - 1 - suffixLen] ===
+      originalText[originalText.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  const getColorAt = (pos: number): string | undefined => {
+    let offset = 0;
+    for (const span of spans) {
+      if (pos >= offset && pos < offset + span.text.length) {
+        return span.color;
+      }
+      offset += span.text.length;
+    }
+    return spans[spans.length - 1].color;
+  };
+
+  const result: TextSpan[] = [];
+
+  if (prefixLen > 0) {
+    let offset = 0;
+    for (const span of spans) {
+      const spanEnd = offset + span.text.length;
+      if (offset >= prefixLen) {
+        break;
+      }
+      if (spanEnd <= prefixLen) {
+        result.push({ ...span });
+      } else {
+        result.push({
+          text: span.text.slice(0, prefixLen - offset),
+          color: span.color,
+        });
+      }
+      offset = spanEnd;
+    }
+  }
+
+  const diffEnd = originalText.length - suffixLen;
+  if (diffEnd > prefixLen) {
+    const insertedText = originalText.slice(prefixLen, diffEnd);
+    const color = prefixLen > 0 ? getColorAt(prefixLen - 1) : "";
+    result.push({ text: insertedText, color });
+  }
+
+  if (suffixLen > 0) {
+    const suffixStart = spansText.length - suffixLen;
+    let offset = 0;
+    for (const span of spans) {
+      const spanEnd = offset + span.text.length;
+      if (spanEnd <= suffixStart) {
+        offset = spanEnd;
+        continue;
+      }
+      if (offset >= suffixStart) {
+        result.push({ ...span });
+      } else {
+        result.push({
+          text: span.text.slice(suffixStart - offset),
+          color: span.color,
+        });
+      }
+      offset = spanEnd;
+    }
+  }
+
+  const joined = result.map((s) => s.text).join("");
+  if (joined !== originalText) {
+    return [{ text: originalText, color: "" }];
+  }
+  return result;
 };
 
 export const redrawTextBoundingBox = (
