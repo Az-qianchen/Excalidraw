@@ -10,6 +10,8 @@ import {
   STATS_PANELS,
   THEME,
   DEFAULT_GRID_STEP,
+  DEFAULT_SIDEBAR,
+  LIBRARY_SIDEBAR_TAB,
   isTestEnv,
 } from "@excalidraw/common";
 
@@ -73,7 +75,7 @@ export const getDefaultAppState = (): Omit<
     isBindingEnabled: true,
     bindingPreference: "enabled",
     isMidpointSnappingEnabled: true,
-    defaultSidebarDockedPreference: false,
+    defaultSidebarDockedPreference: !isTestEnv(),
     isLoading: false,
     isResizing: false,
     isRotating: false,
@@ -83,7 +85,9 @@ export const getDefaultAppState = (): Omit<
     contextMenu: null,
     openMenu: null,
     openPopup: null,
-    openSidebar: null,
+    openSidebar: isTestEnv()
+      ? null
+      : { name: DEFAULT_SIDEBAR.name, tab: LIBRARY_SIDEBAR_TAB },
     openDialog: null,
     previousSelectedElementIds: {},
     resizingElement: null,

@@ -352,10 +352,7 @@ const ImageFiltersButton = ({
   }
 
   return (
-    <Popover.Root
-      open={showImageFilters}
-      onOpenChange={setShowImageFilters}
-    >
+    <Popover.Root open={showImageFilters} onOpenChange={setShowImageFilters}>
       <Popover.Trigger asChild>
         <ToolButton
           type="button"
@@ -1277,6 +1274,7 @@ export const ShapesSwitcher = ({
             setAppState({ openMenu: null, openPopup: null });
           }}
           title={t("toolBar.extraTools")}
+          data-testid="toolbar-extraTools"
         >
           {frameToolSelected
             ? frameToolIcon

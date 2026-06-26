@@ -1996,7 +1996,13 @@ export const MagicIconThin = createIcon(
 );
 
 export const magicWandCloseIcon = createIcon(
-  <g stroke="currentColor" fill="none" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+  <g
+    stroke="currentColor"
+    fill="none"
+    strokeWidth="1.25"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M18 6 6 18" />
     <path d="m6 6 12 12" />
   </g>,
@@ -2532,6 +2538,97 @@ export const settingsIcon = createIcon(
     <path d="M17 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
     <path d="M4 18l11 0" />
     <path d="M19 18l1 0" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: layers
+export const layersIcon = createIcon(
+  <g>
+    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
+    <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+    <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: folder
+export const folderIcon = createIcon(
+  <g>
+    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: chevron-down
+export const chevronDownIcon = createIcon(
+  <g>
+    <path d="m6 9 6 6 6-6" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: file-plus
+export const filePlusIcon = createIcon(
+  <g>
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+    <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+    <path d="M9 15h6" />
+    <path d="M12 18v-6" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: folder-open
+export const folderOpenIcon = createIcon(
+  <g>
+    <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: refresh-cw
+export const refreshIcon = createIcon(
+  <g>
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: file-text
+export const fileIcon = createIcon(
+  <g>
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+    <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+    <path d="M10 9H8" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: save
+export const saveIcon = createIcon(
+  <g>
+    <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+    <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" />
+    <path d="M7 3v4a1 1 0 0 0 1 1h7" />
+  </g>,
+  tablerIconProps,
+);
+
+// lucide-icons: group
+export const groupLayersIcon = createIcon(
+  <g>
+    <path d="M3 7V5c0-1.1.9-2 2-2h2" />
+    <path d="M17 3h2c1.1 0 2 .9 2 2v2" />
+    <path d="M21 17v2c0 1.1-.9 2-2 2h-2" />
+    <path d="M7 21H5c-1.1 0-2-.9-2-2v-2" />
+    <rect width="7" height="5" x="7" y="7" rx="1" />
+    <rect width="7" height="5" x="10" y="12" rx="1" />
   </g>,
   tablerIconProps,
 );

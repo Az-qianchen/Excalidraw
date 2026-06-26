@@ -371,7 +371,12 @@ export const hexToHSLA = (hex: string): HSLA => {
 };
 
 /** HSLA → hex(#RRGGBB[AA])，s/l: 0-100, a: 0-1 */
-export const hslaToHex = (h: number, s: number, l: number, a: number): string => {
+export const hslaToHex = (
+  h: number,
+  s: number,
+  l: number,
+  a: number,
+): string => {
   const tc = tinycolor({ h, s: s / 100, l: l / 100, a });
   const { r, g, b } = tc.toRgb();
   return rgbToHex(r, g, b, a);

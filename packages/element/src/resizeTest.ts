@@ -308,12 +308,11 @@ export const getCornerRadiusHandleCoords = (
   const cx = element.x + element.width / 2;
   const cy = element.y + element.height / 2;
   const margin = isImageElement(element) ? 0 : DEFAULT_TRANSFORM_HANDLE_SPACING;
-  const spacing = isImageElement(element) ? 0 : DEFAULT_TRANSFORM_HANDLE_SPACING;
+  const spacing = isImageElement(element)
+    ? 0
+    : DEFAULT_TRANSFORM_HANDLE_SPACING;
   const offset = margin + ROTATION_RESIZE_HANDLE_GAP + spacing;
-  const handle = pointFrom(
-    element.x,
-    element.y - offset / zoom.value,
-  );
+  const handle = pointFrom(element.x, element.y - offset / zoom.value);
   const [rotatedHandleX, rotatedHandleY] = pointRotateRads(
     handle,
     pointFrom(cx, cy),

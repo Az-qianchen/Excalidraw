@@ -4,16 +4,15 @@ import clsx from "clsx";
 import { hashElementsVersion } from "@excalidraw/element";
 
 import { useUIAppState } from "../context/ui-appState";
+
+import { actionSaveToActiveFile, actionSaveFileToDisk } from "../actions";
+import { useI18n } from "../i18n";
+
 import {
   useExcalidrawElements,
   useExcalidrawActionManager,
   useApp,
 } from "./App";
-import {
-  actionSaveToActiveFile,
-  actionSaveFileToDisk,
-} from "../actions";
-import { useI18n } from "../i18n";
 
 import "./SaveStatus.scss";
 
@@ -74,9 +73,7 @@ export const SaveStatus: React.FC = () => {
   };
 
   const title =
-    status === "saved"
-      ? t("saveStatus.saved")
-      : t("saveStatus.unsavedChanges");
+    status === "saved" ? t("saveStatus.saved") : t("saveStatus.unsavedChanges");
 
   return (
     <div

@@ -174,6 +174,7 @@ import {
   getContainerElement,
   isValidTextContainer,
   redrawTextBoundingBox,
+  handleBindTextResize,
   hasBoundingBox,
   getCommonFrameId,
   getFrameChildren,
@@ -435,6 +436,15 @@ import { getShortcutKey } from "../shortcut";
 
 import { tryParseSpreadsheet } from "../charts";
 
+import { MaskEditor } from "../mask-editor";
+
+import {
+  floodFillMask,
+  applyMaskToImage,
+  invertMask,
+  traceMaskContours,
+} from "../mask-editor/magicWand";
+
 import ConvertElementTypePopup, {
   getConversionTypeFromElements,
   convertElementTypePopupAtom,
@@ -451,18 +461,13 @@ import { ElementCanvasButton } from "./MagicButton";
 import { SVGLayer } from "./SVGLayer";
 import { searchItemInFocusAtom } from "./SearchMenu";
 import { isSidebarDockedAtom } from "./Sidebar/Sidebar";
+import { getStoredSidebarWidth } from "./Sidebar/SidebarResizeHandle";
 import { StaticCanvas, InteractiveCanvas } from "./canvases";
 import NewElementCanvas from "./canvases/NewElementCanvas";
 import { isPointHittingLink } from "./hyperlink/helpers";
-import { MaskEditor } from "../mask-editor";
-import {
-  floodFillMask,
-  applyMaskToImage,
-  invertMask,
-  traceMaskContours,
-} from "../mask-editor/magicWand";
-import type { MagicWandMask, MagicWandContour } from "../mask-editor/magicWand";
+
 import { ToolButton } from "./ToolButton";
+
 import {
   MagicIcon,
   copyIcon,
@@ -472,11 +477,14 @@ import {
   LinkIcon,
   magicWandCloseIcon,
 } from "./icons";
+
 import { AppStateObserver, type OnStateChange } from "./AppStateObserver";
 
 import { findShapeByKey } from "./shapes";
 
 import UnlockPopup from "./UnlockPopup";
+
+import type { MagicWandMask, MagicWandContour } from "../mask-editor/magicWand";
 
 import type { ExcalidrawLibraryIds } from "../data/types";
 
@@ -740,10 +748,7 @@ class App extends React.Component<AppProps, AppState> {
    */
   private keyboardScale: {
     originalElements: ExcalidrawElement[];
-    originalBoundTexts: Map<
-      string,
-      { id: string; fontSize: number }
-    >;
+    originalBoundTexts: Map<string, { id: string; fontSize: number }>;
     pivot: { x: number; y: number };
     initialDistance: number;
     pointerScale: number;
@@ -2209,7 +2214,7 @@ class App extends React.Component<AppProps, AppState> {
           ["--ui-pointerEvents" as any]: shouldBlockPointerEvents
             ? POINTER_EVENTS.disabled
             : POINTER_EVENTS.enabled,
-          ["--right-sidebar-width" as any]: "302px",
+          ["--right-sidebar-width" as any]: `${getStoredSidebarWidth()}px`,
         }}
         ref={this.excalidrawContainerRef}
         onDrop={this.handleAppOnDrop}
@@ -2498,7 +2503,9 @@ class App extends React.Component<AppProps, AppState> {
                                     0,
                                     50,
                                     (v) => {
-                                      this.setState({ magicWandFeatherRadius: v });
+                                      this.setState({
+                                        magicWandFeatherRadius: v,
+                                      });
                                     },
                                   )}
                                   <ToolButton
@@ -2517,7 +2524,8 @@ class App extends React.Component<AppProps, AppState> {
                                     icon={maskToggleIcon}
                                     onClick={() => {
                                       this.setState({
-                                        magicWandInverted: !this.state.magicWandInverted,
+                                        magicWandInverted:
+                                          !this.state.magicWandInverted,
                                       });
                                       this.scene.triggerUpdate();
                                     }}
@@ -2525,12 +2533,15 @@ class App extends React.Component<AppProps, AppState> {
                                   <ToolButton
                                     type="button"
                                     title={t("helpDialog.magicWandContiguous")}
-                                    aria-label={t("helpDialog.magicWandContiguous")}
+                                    aria-label={t(
+                                      "helpDialog.magicWandContiguous",
+                                    )}
                                     selected={this.state.magicWandContiguous}
                                     icon={LinkIcon}
                                     onClick={() => {
                                       this.setState({
-                                        magicWandContiguous: !this.state.magicWandContiguous,
+                                        magicWandContiguous:
+                                          !this.state.magicWandContiguous,
                                       });
                                       this.scene.triggerUpdate();
                                     }}
@@ -3664,26 +3675,17 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   componentDidUpdate(prevProps: AppProps, prevState: AppState) {
-    if (
-      !prevState.maskingElementId &&
-      this.state.maskingElementId
-    ) {
+    if (!prevState.maskingElementId && this.state.maskingElementId) {
       this.maskPointHistory = [];
     }
 
     // 进入魔法抠图模式时加载图像数据
-    if (
-      !prevState.magicWandElementId &&
-      this.state.magicWandElementId
-    ) {
+    if (!prevState.magicWandElementId && this.state.magicWandElementId) {
       this.loadMagicWandImageData();
     }
 
     // 退出魔法抠图模式时清理缓存
-    if (
-      prevState.magicWandElementId &&
-      !this.state.magicWandElementId
-    ) {
+    if (prevState.magicWandElementId && !this.state.magicWandElementId) {
       this.magicWandImageData = null;
       this.magicWandCurrentMask = null;
       this.magicWandDisplayMask = null;
@@ -4324,6 +4326,9 @@ class App extends React.Component<AppProps, AppState> {
           this.scene.getElementsMapIncludingDeleted(),
         );
         redrawTextBoundingBox(newElement, container, this.scene);
+        if (container) {
+          handleBindTextResize(container, this.scene, "s", false);
+        }
       }
     });
 
@@ -5114,10 +5119,7 @@ class App extends React.Component<AppProps, AppState> {
             this.applyMask();
             return;
           }
-          if (
-            event.key === KEYS.BACKSPACE ||
-            event.key === KEYS.DELETE
-          ) {
+          if (event.key === KEYS.BACKSPACE || event.key === KEYS.DELETE) {
             event.preventDefault();
             const newPoints =
               this.state.selectedMaskPointIndex !== null
@@ -6877,8 +6879,12 @@ class App extends React.Component<AppProps, AppState> {
   // ---------------------------------------------------------------------------
 
   private startKeyboardScale = () => {
-    if (this.keyboardScale) return;
-    if (this.state.activeTool.type !== "selection") return;
+    if (this.keyboardScale) {
+      return;
+    }
+    if (this.state.activeTool.type !== "selection") {
+      return;
+    }
     if (
       this.state.croppingElementId ||
       this.state.maskingElementId ||
@@ -6888,7 +6894,9 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     const selectedElements = this.scene.getSelectedElements(this.state);
-    if (selectedElements.length === 0) return;
+    if (selectedElements.length === 0) {
+      return;
+    }
 
     const [minX, minY, maxX, maxY] = getCommonBounds(selectedElements);
     const pivot = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
@@ -6906,7 +6914,7 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     const originalElements = selectedElements.map(
-      (el) => ({ ...el }) as ExcalidrawElement,
+      (el) => ({ ...el } as ExcalidrawElement),
     );
     const originalBoundTexts = new Map<
       string,
@@ -6935,7 +6943,9 @@ class App extends React.Component<AppProps, AppState> {
     this.keyboardScale = state;
 
     const onPointerMove = (event: PointerEvent) => {
-      if (!self.keyboardScale || self.keyboardScale.pointerLocked) return;
+      if (!self.keyboardScale || self.keyboardScale.pointerLocked) {
+        return;
+      }
       const scene = viewportCoordsToSceneCoords(event, self.state);
       const distance = Math.hypot(scene.x - pivot.x, scene.y - pivot.y);
       const ratio = distance / state.initialDistance;
@@ -6947,7 +6957,9 @@ class App extends React.Component<AppProps, AppState> {
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if (!self.keyboardScale) return;
+      if (!self.keyboardScale) {
+        return;
+      }
       if (event.button === POINTER_BUTTON.MAIN) {
         event.preventDefault();
         event.stopPropagation();
@@ -6960,7 +6972,9 @@ class App extends React.Component<AppProps, AppState> {
     };
 
     const onContextMenu = (event: MouseEvent) => {
-      if (self.keyboardScale) event.preventDefault();
+      if (self.keyboardScale) {
+        event.preventDefault();
+      }
     };
 
     state.cleanup = () => {
@@ -6978,7 +6992,9 @@ class App extends React.Component<AppProps, AppState> {
 
   private applyKeyboardScale = (scale: number) => {
     const state = this.keyboardScale;
-    if (!state) return;
+    if (!state) {
+      return;
+    }
 
     const magnitude = Math.max(Math.abs(scale), 0.01);
     state.currentScale = magnitude;
@@ -6987,7 +7003,9 @@ class App extends React.Component<AppProps, AppState> {
 
     for (const orig of originalElements) {
       const latest = this.scene.getElement(orig.id);
-      if (!latest) continue;
+      if (!latest) {
+        continue;
+      }
 
       const newX = pivot.x + (orig.x - pivot.x) * magnitude;
       const newY = pivot.y + (orig.y - pivot.y) * magnitude;
@@ -7046,14 +7064,18 @@ class App extends React.Component<AppProps, AppState> {
 
   private finishKeyboardScale = (commit: boolean) => {
     const state = this.keyboardScale;
-    if (!state) return;
+    if (!state) {
+      return;
+    }
 
     state.cleanup();
 
     if (!commit) {
       for (const orig of state.originalElements) {
         const latest = this.scene.getElement(orig.id);
-        if (!latest) continue;
+        if (!latest) {
+          continue;
+        }
 
         const restore: Record<string, unknown> = {
           x: orig.x,
@@ -7100,7 +7122,9 @@ class App extends React.Component<AppProps, AppState> {
   private isApplyingMask = false;
 
   private applyMask = async () => {
-    if (this.isApplyingMask) return;
+    if (this.isApplyingMask) {
+      return;
+    }
     this.isApplyingMask = true;
 
     const { maskingElementId, maskingPoints, maskingMode } = this.state;
@@ -7169,7 +7193,14 @@ class App extends React.Component<AppProps, AppState> {
     max: number,
     onChange: (v: number) => void,
   ) => (
-    <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "var(--default-button-size)" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        height: "var(--default-button-size)",
+      }}
+    >
       <label style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{label}</label>
       <input
         type="text"
@@ -7178,7 +7209,9 @@ class App extends React.Component<AppProps, AppState> {
         onChange={(e) => {
           const v = e.target.value;
           if (v === "" || /^\d*$/.test(v)) {
-            onChange(v === "" ? 0 : Math.min(max, Math.max(min, parseInt(v, 10))));
+            onChange(
+              v === "" ? 0 : Math.min(max, Math.max(min, parseInt(v, 10))),
+            );
           }
         }}
         onKeyDown={(e) => {
@@ -7191,7 +7224,9 @@ class App extends React.Component<AppProps, AppState> {
           }
         }}
         onWheel={(e) => {
-          onChange(Math.min(max, Math.max(min, value + (e.deltaY > 0 ? -1 : 1))));
+          onChange(
+            Math.min(max, Math.max(min, value + (e.deltaY > 0 ? -1 : 1))),
+          );
         }}
         autoComplete="off"
         spellCheck={false}
@@ -7202,17 +7237,25 @@ class App extends React.Component<AppProps, AppState> {
   /** 加载当前图片的像素数据到缓存 */
   private loadMagicWandImageData = () => {
     const { magicWandElementId } = this.state;
-    if (!magicWandElementId) return;
+    if (!magicWandElementId) {
+      return;
+    }
 
     const element = this.scene.getElement(magicWandElementId);
-    if (!element || !isImageElement(element) || !element.fileId) return;
+    if (!element || !isImageElement(element) || !element.fileId) {
+      return;
+    }
 
     const fileData = this.files[element.fileId];
-    if (!fileData) return;
+    if (!fileData) {
+      return;
+    }
 
     const img = new Image();
     img.onload = () => {
-      if (!this.state.magicWandElementId) return;
+      if (!this.state.magicWandElementId) {
+        return;
+      }
 
       const crop = element.crop;
       const srcW = crop ? crop.width : img.naturalWidth;
@@ -7222,7 +7265,9 @@ class App extends React.Component<AppProps, AppState> {
       canvas.width = srcW;
       canvas.height = srcH;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        return;
+      }
 
       const srcX = crop ? crop.x : 0;
       const srcY = crop ? crop.y : 0;
@@ -7241,17 +7286,19 @@ class App extends React.Component<AppProps, AppState> {
   private handleMagicWandPointerDown = (
     event: React.PointerEvent<HTMLElement>,
   ) => {
-    const { magicWandElementId, magicWandThreshold, magicWandContiguous } = this.state;
-    if (!magicWandElementId || !this.magicWandImageData) return;
+    const { magicWandElementId, magicWandThreshold, magicWandContiguous } =
+      this.state;
+    if (!magicWandElementId || !this.magicWandImageData) {
+      return;
+    }
 
     const element = this.scene.getElement(magicWandElementId);
-    if (!element || !isImageElement(element)) return;
+    if (!element || !isImageElement(element)) {
+      return;
+    }
 
     const scenePointer = viewportCoordsToSceneCoords(event, this.state);
-    const globalPoint = pointFrom<GlobalPoint>(
-      scenePointer.x,
-      scenePointer.y,
-    );
+    const globalPoint = pointFrom<GlobalPoint>(scenePointer.x, scenePointer.y);
 
     const imgLocal = MaskEditor.globalToImageLocal(
       globalPoint,
@@ -7285,13 +7332,19 @@ class App extends React.Component<AppProps, AppState> {
   private isApplyingMagicWand = false;
 
   private applyMagicWand = async () => {
-    if (this.isApplyingMagicWand) return;
+    if (this.isApplyingMagicWand) {
+      return;
+    }
     this.isApplyingMagicWand = true;
 
     const { magicWandElementId, magicWandFeatherRadius, magicWandInverted } =
       this.state;
 
-    if (!magicWandElementId || !this.magicWandImageData || !this.magicWandCurrentMask) {
+    if (
+      !magicWandElementId ||
+      !this.magicWandImageData ||
+      !this.magicWandCurrentMask
+    ) {
       this.cancelMagicWand();
       return;
     }
@@ -7338,8 +7391,7 @@ class App extends React.Component<AppProps, AppState> {
         this.cancelMagicWand();
       });
 
-      const newFileId =
-        nanoid() as import("@excalidraw/element/types").FileId;
+      const newFileId = nanoid() as import("@excalidraw/element/types").FileId;
 
       const newFileData: BinaryFileData = {
         id: newFileId,
@@ -9039,181 +9091,182 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       if (this.state.activeTool.type === "lasso") {
-      const hitSelectedElement =
-        pointerDownState.hit.element &&
-        this.isASelectedElement(pointerDownState.hit.element);
-      const shouldForceLassoReselect =
-        event.altKey &&
-        event[KEYS.CTRL_OR_CMD] &&
-        !pointerDownState.resize.handleType;
-      const shouldStartLassoSelection =
-        shouldForceLassoReselect ||
-        (!pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements &&
-          !pointerDownState.resize.handleType &&
-          !hitSelectedElement);
+        const hitSelectedElement =
+          pointerDownState.hit.element &&
+          this.isASelectedElement(pointerDownState.hit.element);
+        const shouldForceLassoReselect =
+          event.altKey &&
+          event[KEYS.CTRL_OR_CMD] &&
+          !pointerDownState.resize.handleType;
+        const shouldStartLassoSelection =
+          shouldForceLassoReselect ||
+          (!pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements &&
+            !pointerDownState.resize.handleType &&
+            !hitSelectedElement);
 
-      if (shouldStartLassoSelection) {
-        if (!this.lassoTrail.hasCurrentTrail) {
-          this.lassoTrail.startPath(
-            pointerDownState.origin.x,
-            pointerDownState.origin.y,
-            event.shiftKey,
-          );
-        }
-
-        // block dragging after lasso selection on PCs until the next pointer down
-        // (on mobile or tablet, we want to allow user to drag immediately)
-        pointerDownState.drag.blockDragging =
-          this.editorInterface.formFactor === "desktop";
-      }
-
-      // only for mobile or tablet, if we hit an element, select it immediately like normal selection
-      if (
-        this.editorInterface.formFactor !== "desktop" &&
-        pointerDownState.hit.element &&
-        !hitSelectedElement
-      ) {
-        this.setState((prevState) => {
-          const nextSelectedElementIds: { [id: string]: true } = {
-            ...prevState.selectedElementIds,
-            [pointerDownState.hit.element!.id]: true,
-          };
-
-          const previouslySelectedElements: ExcalidrawElement[] = [];
-
-          Object.keys(prevState.selectedElementIds).forEach((id) => {
-            const element = this.scene.getElement(id);
-            element && previouslySelectedElements.push(element);
-          });
-
-          const hitElement = pointerDownState.hit.element!;
-
-          // if hitElement is frame-like, deselect all of its elements
-          // if they are selected
-          if (isFrameLikeElement(hitElement)) {
-            getFrameChildren(previouslySelectedElements, hitElement.id).forEach(
-              (element) => {
-                delete nextSelectedElementIds[element.id];
-              },
+        if (shouldStartLassoSelection) {
+          if (!this.lassoTrail.hasCurrentTrail) {
+            this.lassoTrail.startPath(
+              pointerDownState.origin.x,
+              pointerDownState.origin.y,
+              event.shiftKey,
             );
-          } else if (hitElement.frameId) {
-            // if hitElement is in a frame and its frame has been selected
-            // disable selection for the given element
-            if (nextSelectedElementIds[hitElement.frameId]) {
-              delete nextSelectedElementIds[hitElement.id];
-            }
-          } else {
-            // hitElement is neither a frame nor an element in a frame
-            // but since hitElement could be in a group with some frames
-            // this means selecting hitElement will have the frames selected as well
-            // because we want to keep the invariant:
-            // - frames and their elements are not selected at the same time
-            // we deselect elements in those frames that were previously selected
-
-            const groupIds = hitElement.groupIds;
-            const framesInGroups = new Set(
-              groupIds
-                .flatMap((gid) =>
-                  getElementsInGroup(this.scene.getNonDeletedElements(), gid),
-                )
-                .filter((element) => isFrameLikeElement(element))
-                .map((frame) => frame.id),
-            );
-
-            if (framesInGroups.size > 0) {
-              previouslySelectedElements.forEach((element) => {
-                if (element.frameId && framesInGroups.has(element.frameId)) {
-                  // deselect element and groups containing the element
-                  delete nextSelectedElementIds[element.id];
-                  element.groupIds
-                    .flatMap((gid) =>
-                      getElementsInGroup(
-                        this.scene.getNonDeletedElements(),
-                        gid,
-                      ),
-                    )
-                    .forEach((element) => {
-                      delete nextSelectedElementIds[element.id];
-                    });
-                }
-              });
-            }
           }
 
-          return {
-            ...selectGroupsForSelectedElements(
-              {
-                editingGroupId: prevState.editingGroupId,
-                selectedElementIds: nextSelectedElementIds,
-              },
-              this.scene.getNonDeletedElements(),
-              prevState,
-              this,
-            ),
-            showHyperlinkPopup:
-              hitElement.link || isEmbeddableElement(hitElement)
-                ? "info"
-                : false,
-          };
-        });
-        pointerDownState.hit.wasAddedToSelection = true;
+          // block dragging after lasso selection on PCs until the next pointer down
+          // (on mobile or tablet, we want to allow user to drag immediately)
+          pointerDownState.drag.blockDragging =
+            this.editorInterface.formFactor === "desktop";
+        }
+
+        // only for mobile or tablet, if we hit an element, select it immediately like normal selection
+        if (
+          this.editorInterface.formFactor !== "desktop" &&
+          pointerDownState.hit.element &&
+          !hitSelectedElement
+        ) {
+          this.setState((prevState) => {
+            const nextSelectedElementIds: { [id: string]: true } = {
+              ...prevState.selectedElementIds,
+              [pointerDownState.hit.element!.id]: true,
+            };
+
+            const previouslySelectedElements: ExcalidrawElement[] = [];
+
+            Object.keys(prevState.selectedElementIds).forEach((id) => {
+              const element = this.scene.getElement(id);
+              element && previouslySelectedElements.push(element);
+            });
+
+            const hitElement = pointerDownState.hit.element!;
+
+            // if hitElement is frame-like, deselect all of its elements
+            // if they are selected
+            if (isFrameLikeElement(hitElement)) {
+              getFrameChildren(
+                previouslySelectedElements,
+                hitElement.id,
+              ).forEach((element) => {
+                delete nextSelectedElementIds[element.id];
+              });
+            } else if (hitElement.frameId) {
+              // if hitElement is in a frame and its frame has been selected
+              // disable selection for the given element
+              if (nextSelectedElementIds[hitElement.frameId]) {
+                delete nextSelectedElementIds[hitElement.id];
+              }
+            } else {
+              // hitElement is neither a frame nor an element in a frame
+              // but since hitElement could be in a group with some frames
+              // this means selecting hitElement will have the frames selected as well
+              // because we want to keep the invariant:
+              // - frames and their elements are not selected at the same time
+              // we deselect elements in those frames that were previously selected
+
+              const groupIds = hitElement.groupIds;
+              const framesInGroups = new Set(
+                groupIds
+                  .flatMap((gid) =>
+                    getElementsInGroup(this.scene.getNonDeletedElements(), gid),
+                  )
+                  .filter((element) => isFrameLikeElement(element))
+                  .map((frame) => frame.id),
+              );
+
+              if (framesInGroups.size > 0) {
+                previouslySelectedElements.forEach((element) => {
+                  if (element.frameId && framesInGroups.has(element.frameId)) {
+                    // deselect element and groups containing the element
+                    delete nextSelectedElementIds[element.id];
+                    element.groupIds
+                      .flatMap((gid) =>
+                        getElementsInGroup(
+                          this.scene.getNonDeletedElements(),
+                          gid,
+                        ),
+                      )
+                      .forEach((element) => {
+                        delete nextSelectedElementIds[element.id];
+                      });
+                  }
+                });
+              }
+            }
+
+            return {
+              ...selectGroupsForSelectedElements(
+                {
+                  editingGroupId: prevState.editingGroupId,
+                  selectedElementIds: nextSelectedElementIds,
+                },
+                this.scene.getNonDeletedElements(),
+                prevState,
+                this,
+              ),
+              showHyperlinkPopup:
+                hitElement.link || isEmbeddableElement(hitElement)
+                  ? "info"
+                  : false,
+            };
+          });
+          pointerDownState.hit.wasAddedToSelection = true;
+        }
+      } else if (this.state.activeTool.type === "text") {
+        this.handleTextOnPointerDown(event, pointerDownState);
+      } else if (
+        this.state.activeTool.type === "arrow" ||
+        this.state.activeTool.type === "line"
+      ) {
+        this.handleLinearElementOnPointerDown(
+          event,
+          this.state.activeTool.type,
+          pointerDownState,
+        );
+      } else if (this.state.activeTool.type === "freedraw") {
+        this.handleFreeDrawElementOnPointerDown(
+          event,
+          this.state.activeTool.type,
+          pointerDownState,
+        );
+      } else if (this.state.activeTool.type === "custom") {
+        setCursorForShape(this.interactiveCanvas, this.state);
+      } else if (
+        this.state.activeTool.type === TOOL_TYPE.frame ||
+        this.state.activeTool.type === TOOL_TYPE.magicframe
+      ) {
+        this.createFrameElementOnPointerDown(
+          pointerDownState,
+          this.state.activeTool.type,
+        );
+      } else if (this.state.activeTool.type === "laser") {
+        this.laserTrails.startPath(
+          pointerDownState.lastCoords.x,
+          pointerDownState.lastCoords.y,
+        );
+      } else if (
+        this.state.activeTool.type !== "eraser" &&
+        this.state.activeTool.type !== "hand" &&
+        this.state.activeTool.type !== "image"
+      ) {
+        this.createGenericElementOnPointerDown(
+          this.state.activeTool.type,
+          pointerDownState,
+        );
       }
-    } else if (this.state.activeTool.type === "text") {
-      this.handleTextOnPointerDown(event, pointerDownState);
-    } else if (
-      this.state.activeTool.type === "arrow" ||
-      this.state.activeTool.type === "line"
-    ) {
-      this.handleLinearElementOnPointerDown(
-        event,
-        this.state.activeTool.type,
-        pointerDownState,
-      );
-    } else if (this.state.activeTool.type === "freedraw") {
-      this.handleFreeDrawElementOnPointerDown(
-        event,
-        this.state.activeTool.type,
-        pointerDownState,
-      );
-    } else if (this.state.activeTool.type === "custom") {
-      setCursorForShape(this.interactiveCanvas, this.state);
-    } else if (
-      this.state.activeTool.type === TOOL_TYPE.frame ||
-      this.state.activeTool.type === TOOL_TYPE.magicframe
-    ) {
-      this.createFrameElementOnPointerDown(
-        pointerDownState,
-        this.state.activeTool.type,
-      );
-    } else if (this.state.activeTool.type === "laser") {
-      this.laserTrails.startPath(
-        pointerDownState.lastCoords.x,
-        pointerDownState.lastCoords.y,
-      );
-    } else if (
-      this.state.activeTool.type !== "eraser" &&
-      this.state.activeTool.type !== "hand" &&
-      this.state.activeTool.type !== "image"
-    ) {
-      this.createGenericElementOnPointerDown(
-        this.state.activeTool.type,
-        pointerDownState,
-      );
-    }
 
-    this.props?.onPointerDown?.(this.state.activeTool, pointerDownState);
-    this.onPointerDownEmitter.trigger(
-      this.state.activeTool,
-      pointerDownState,
-      event,
-    );
-
-    if (this.state.activeTool.type === "eraser") {
-      this.eraserTrail.startPath(
-        pointerDownState.lastCoords.x,
-        pointerDownState.lastCoords.y,
+      this.props?.onPointerDown?.(this.state.activeTool, pointerDownState);
+      this.onPointerDownEmitter.trigger(
+        this.state.activeTool,
+        pointerDownState,
+        event,
       );
-    }
+
+      if (this.state.activeTool.type === "eraser") {
+        this.eraserTrail.startPath(
+          pointerDownState.lastCoords.x,
+          pointerDownState.lastCoords.y,
+        );
+      }
     }
 
     const onPointerMove =
@@ -9936,7 +9989,8 @@ class App extends React.Component<AppProps, AppState> {
           !pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements &&
           (!this.state.selectedLinearElement?.isEditing ||
             (hitElement &&
-              hitElement?.id !== this.state.selectedLinearElement?.elementId)) &&
+              hitElement?.id !==
+                this.state.selectedLinearElement?.elementId)) &&
           !this.state.maskingElementId &&
           !this.state.magicWandElementId &&
           !this.cornerRadiusDrag
@@ -11873,9 +11927,9 @@ class App extends React.Component<AppProps, AppState> {
           elementsToHighlight: null,
           selectedElementsAreBeingDragged: false,
           currentItemRoundness: element?.roundness
-            ? "round" as const
+            ? ("round" as const)
             : element
-            ? "sharp" as const
+            ? ("sharp" as const)
             : prevState.currentItemRoundness,
           snapLines: updateStable(prevState.snapLines, []),
           originSnapOffset: null,

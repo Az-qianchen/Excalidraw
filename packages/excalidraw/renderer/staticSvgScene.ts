@@ -20,7 +20,11 @@ import {
   getEmbedLink,
 } from "@excalidraw/element";
 import { LinearElementEditor } from "@excalidraw/element";
-import { getBoundTextElement, getContainerElement, getBoundTextMaxWidth } from "@excalidraw/element";
+import {
+  getBoundTextElement,
+  getContainerElement,
+  getBoundTextMaxWidth,
+} from "@excalidraw/element";
 import { getLineHeightInPx } from "@excalidraw/element";
 import {
   isArrowElement,
@@ -34,7 +38,11 @@ import { getContainingFrame } from "@excalidraw/element";
 
 import { getCornerRadius, isPathALoop } from "@excalidraw/element";
 
-import { ShapeCache, getDashArrayDashed, getDashArrayDotted } from "@excalidraw/element";
+import {
+  ShapeCache,
+  getDashArrayDashed,
+  getDashArrayDotted,
+} from "@excalidraw/element";
 
 import { getElementAbsoluteCoords } from "@excalidraw/element";
 import { splitSpansIntoLines } from "@excalidraw/element";
@@ -595,19 +603,11 @@ const renderElementToSvg = (
           clipPath.appendChild(clipRect);
           addToRoot(clipPath, element);
 
-          imageG.setAttributeNS(
-            SVG_NS,
-            "clip-path",
-            `url(#${clipPath.id})`,
-          );
+          imageG.setAttributeNS(SVG_NS, "clip-path", `url(#${clipPath.id})`);
         }
 
-        if (
-          element.strokeColor !== "transparent" &&
-          element.strokeWidth > 0
-        ) {
-          const shape =
-            ShapeCache.generateElementShape(element, renderConfig);
+        if (element.strokeColor !== "transparent" && element.strokeWidth > 0) {
+          const shape = ShapeCache.generateElementShape(element, renderConfig);
           const strokeNode = roughSVGDrawWithPrecision(
             rsvg,
             shape,
@@ -714,7 +714,10 @@ const renderElementToSvg = (
             spanMaxWidth,
           );
           for (let i = 0; i < spanLines.length; i++) {
-            const textEl = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
+            const textEl = svgRoot.ownerDocument.createElementNS(
+              SVG_NS,
+              "text",
+            );
             textEl.setAttribute("x", `${horizontalOffset}`);
             textEl.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
             textEl.setAttribute("font-family", getFontFamilyString(element));
@@ -725,7 +728,10 @@ const renderElementToSvg = (
             textEl.setAttribute("dominant-baseline", "alphabetic");
 
             for (const span of spanLines[i]) {
-              const tspan = svgRoot.ownerDocument.createElementNS(SVG_NS, "tspan");
+              const tspan = svgRoot.ownerDocument.createElementNS(
+                SVG_NS,
+                "tspan",
+              );
               tspan.textContent = span.text;
               const spanColor = span.color || element.strokeColor;
               tspan.setAttribute(

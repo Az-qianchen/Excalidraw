@@ -165,7 +165,10 @@ export class ShapeCache {
 
 export const getDashArrayDashed = (strokeWidth: number) => [8, 8 + strokeWidth];
 
-export const getDashArrayDotted = (strokeWidth: number) => [1.5, 6 + strokeWidth];
+export const getDashArrayDotted = (strokeWidth: number) => [
+  1.5,
+  6 + strokeWidth,
+];
 
 export function adjustRoughness(element: ExcalidrawElement): number {
   const roughness = element.roughness;
@@ -765,11 +768,9 @@ const generateRectanguloidShape = (
     const h = element.height;
     const r = getCornerRadius(Math.min(w, h), element);
     return generator.path(
-      `M ${r} 0 L ${w - r} 0 Q ${w} 0, ${w} ${r} L ${w} ${
-        h - r
-      } Q ${w} ${h}, ${w - r} ${h} L ${r} ${h} Q 0 ${h}, 0 ${
-        h - r
-      } L 0 ${r} Q 0 0, ${r} 0`,
+      `M ${r} 0 L ${w - r} 0 Q ${w} 0, ${w} ${r} L ${w} ${h - r} Q ${w} ${h}, ${
+        w - r
+      } ${h} L ${r} ${h} Q 0 ${h}, 0 ${h - r} L 0 ${r} Q 0 0, ${r} 0`,
       options,
     );
   }
@@ -905,10 +906,7 @@ const _generateElementShape = (
           // 有背景填充的线条元素
           if (element.type === "line" && !isPathALoop(element.points)) {
             shape = [
-              generator.linearPath(
-                points as unknown as RoughPoint[],
-                options,
-              ),
+              generator.linearPath(points as unknown as RoughPoint[], options),
             ];
             if (points.length >= 3) {
               const fillOptions = {
@@ -916,10 +914,7 @@ const _generateElementShape = (
                 stroke: "none",
               };
               const d = points
-                .map(
-                  (p, i) =>
-                    `${i === 0 ? "M" : "L"}${p[0]} ${p[1]}`,
-                )
+                .map((p, i) => `${i === 0 ? "M" : "L"}${p[0]} ${p[1]}`)
                 .join("");
               shape.unshift(generator.path(d, fillOptions));
             }
@@ -1009,14 +1004,10 @@ const _generateElementShape = (
       return shape;
     }
     case "image": {
-      return generateRectanguloidShape(
-        element,
-        generator,
-        {
-          ...generateRoughOptions(element, !!element.roundness, isDarkMode),
-          fill: "transparent",
-        },
-      );
+      return generateRectanguloidShape(element, generator, {
+        ...generateRoughOptions(element, !!element.roundness, isDarkMode),
+        fill: "transparent",
+      });
     }
     default: {
       assertNever(

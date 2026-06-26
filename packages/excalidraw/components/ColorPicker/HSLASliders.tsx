@@ -43,7 +43,10 @@ export const HSLASliderRow = ({
   <div className="hsla-slider-row">
     <label className="hsla-slider-label">{label}</label>
     <div
-      className={clsx("hsla-slider-track", isAlpha && "hsla-slider-track--alpha")}
+      className={clsx(
+        "hsla-slider-track",
+        isAlpha && "hsla-slider-track--alpha",
+      )}
     >
       <input
         type="range"
@@ -113,10 +116,46 @@ export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
 
   /** 滑块配置：H/S/L/A 四维统一数据结构 */
   const sliders = [
-    { label: "H", value: hsla.h, min: 0, max: 360, step: 1, bg: HUE_GRADIENT, aria: t("colorPicker.hue"), alpha: false },
-    { label: "S", value: hsla.s, min: 0, max: 100, step: 1, bg: satGradient, aria: t("colorPicker.saturation"), alpha: false },
-    { label: "L", value: hsla.l, min: 0, max: 100, step: 1, bg: "linear-gradient(to right, #000, #fff)", aria: t("colorPicker.lightness"), alpha: false },
-    { label: "A", value: hsla.a, min: 0, max: 100, step: 1, bg: alphaGradient, aria: t("colorPicker.alpha"), alpha: true },
+    {
+      label: "H",
+      value: hsla.h,
+      min: 0,
+      max: 360,
+      step: 1,
+      bg: HUE_GRADIENT,
+      aria: t("colorPicker.hue"),
+      alpha: false,
+    },
+    {
+      label: "S",
+      value: hsla.s,
+      min: 0,
+      max: 100,
+      step: 1,
+      bg: satGradient,
+      aria: t("colorPicker.saturation"),
+      alpha: false,
+    },
+    {
+      label: "L",
+      value: hsla.l,
+      min: 0,
+      max: 100,
+      step: 1,
+      bg: "linear-gradient(to right, #000, #fff)",
+      aria: t("colorPicker.lightness"),
+      alpha: false,
+    },
+    {
+      label: "A",
+      value: hsla.a,
+      min: 0,
+      max: 100,
+      step: 1,
+      bg: alphaGradient,
+      aria: t("colorPicker.alpha"),
+      alpha: true,
+    },
   ];
 
   return (
@@ -134,7 +173,9 @@ export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
           disabled={isDisabled}
           ariaLabel={aria}
           onChange={(v) =>
-            handleChange({ [label.toLowerCase() as keyof typeof hsla]: v } as Partial<typeof hsla>)
+            handleChange({
+              [label.toLowerCase() as keyof typeof hsla]: v,
+            } as Partial<typeof hsla>)
           }
         />
       ))}

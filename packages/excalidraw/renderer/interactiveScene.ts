@@ -98,7 +98,6 @@ import {
   getTextBoxPadding,
 } from "../textAutoResizeHandle";
 import { MaskEditor, MASK_MIDPOINT_HANDLE_SIZE } from "../mask-editor";
-import type { MagicWandMask, MagicWandContour } from "../mask-editor/magicWand";
 
 import {
   bootstrapCanvas,
@@ -106,6 +105,8 @@ import {
   getNormalizedCanvasDimensions,
   strokeRectWithRotation_simple,
 } from "./helpers";
+
+import type { MagicWandMask, MagicWandContour } from "../mask-editor/magicWand";
 
 import type {
   AppState,
@@ -1660,14 +1661,20 @@ const renderMagicWandOverlay = (
     for (let i = 0; i < mask.data.length; i++) {
       if (mask.data[i]) {
         const idx = i * 4;
-        imgData.data[idx] = 56;     // R
+        imgData.data[idx] = 56; // R
         imgData.data[idx + 1] = 132; // G
         imgData.data[idx + 2] = 244; // B
-        imgData.data[idx + 3] = 38;  // A
+        imgData.data[idx + 3] = 38; // A
       }
     }
     tmpCtx.putImageData(imgData, 0, 0);
-    context.drawImage(_magicWandTmpCanvas, -width / 2, -height / 2, width, height);
+    context.drawImage(
+      _magicWandTmpCanvas,
+      -width / 2,
+      -height / 2,
+      width,
+      height,
+    );
     context.restore();
 
     // 绘制 marching ants 轮廓虚线
@@ -1689,8 +1696,14 @@ const renderMagicWandOverlay = (
         const px = (contour.points[i].x * scaleX - width / 2) * flipX;
         const py = (contour.points[i].y * scaleY - height / 2) * flipY;
         // 应用元素变换
-        const gx = cx + px * Math.cos(magicWandElement.angle) - py * Math.sin(magicWandElement.angle);
-        const gy = cy + px * Math.sin(magicWandElement.angle) + py * Math.cos(magicWandElement.angle);
+        const gx =
+          cx +
+          px * Math.cos(magicWandElement.angle) -
+          py * Math.sin(magicWandElement.angle);
+        const gy =
+          cy +
+          px * Math.sin(magicWandElement.angle) +
+          py * Math.cos(magicWandElement.angle);
         if (i === 0) {
           context.moveTo(gx, gy);
         } else {
@@ -1875,10 +1888,7 @@ const renderElementSizeLabel = (
     cy = absCy;
     angle = element.angle;
   } else {
-    const [x1, y1, x2, y2] = getCommonBounds(
-      selectedElements,
-      elementsMap,
-    );
+    const [x1, y1, x2, y2] = getCommonBounds(selectedElements, elementsMap);
     width = x2 - x1;
     height = y2 - y1;
     cx = (x1 + x2) / 2;
@@ -1890,7 +1900,9 @@ const renderElementSizeLabel = (
     return;
   }
 
-  const labelText = `${formatDimensionValue(Math.max(0, width))} \u00d7 ${formatDimensionValue(Math.max(0, height))}`;
+  const labelText = `${formatDimensionValue(
+    Math.max(0, width),
+  )} \u00d7 ${formatDimensionValue(Math.max(0, height))}`;
   const textWidth = measureSizeLabelText(labelText);
   const pillWidth = textWidth + SIZE_LABEL_PADDING_X * 2;
   const pillHeight = SIZE_LABEL_FONT_SIZE + SIZE_LABEL_PADDING_Y * 2;
@@ -1936,12 +1948,7 @@ const renderElementSizeLabel = (
     );
   } else {
     // roundRect 不可用时的回退方案：绘制矩形
-    context.rect(
-      -pillWidth / 2,
-      -pillHeight / 2,
-      pillWidth,
-      pillHeight,
-    );
+    context.rect(-pillWidth / 2, -pillHeight / 2, pillWidth, pillHeight);
   }
   context.fill();
 
@@ -2515,7 +2522,13 @@ const _renderInteractiveScene = ({
       const magicWandElement = elementsMap.get(appState.magicWandElementId);
 
       if (magicWandElement && isImageElement(magicWandElement)) {
-        renderMagicWandOverlay(context, renderConfig, appState, magicWandElement, app);
+        renderMagicWandOverlay(
+          context,
+          renderConfig,
+          appState,
+          magicWandElement,
+          app,
+        );
       }
     }
 

@@ -62,6 +62,8 @@ import {
 
 import { deriveStylesPanelMode } from "@excalidraw/common";
 
+import { DEFAULT_IMAGE_HSLA } from "@excalidraw/element/types";
+
 import type { LocalPoint, Radians } from "@excalidraw/math";
 
 import type {
@@ -76,7 +78,6 @@ import type {
   TextAlign,
   VerticalAlign,
 } from "@excalidraw/element/types";
-import { DEFAULT_IMAGE_HSLA } from "@excalidraw/element/types";
 
 import type { Scene } from "@excalidraw/element";
 
@@ -155,12 +156,12 @@ import {
 
 import { getShortcutKey } from "../shortcut";
 
-import { register } from "./register";
-
 import {
   applyColorToTextSelection,
   getTextSelection,
 } from "../wysiwyg/textEditorState";
+
+import { register } from "./register";
 
 import type { AppClassProperties, AppState, Primitive } from "../types";
 
@@ -576,8 +577,7 @@ export const actionChangeStrokeWidth = register<
       app,
       (element) => element.strokeWidth,
       (element) => element.hasOwnProperty("strokeWidth"),
-      (hasSelection) =>
-        hasSelection ? null : appState.currentItemStrokeWidth,
+      (hasSelection) => (hasSelection ? null : appState.currentItemStrokeWidth),
     );
 
     return (
@@ -609,10 +609,7 @@ export const actionChangeStrokeWidth = register<
             value={strokeWidth}
             onChange={(value) => updateData(value)}
           />
-          <StrokeWidthInput
-            value={strokeWidth}
-            onChange={updateData}
-          />
+          <StrokeWidthInput value={strokeWidth} onChange={updateData} />
         </div>
       </fieldset>
     );
@@ -826,10 +823,42 @@ export const actionChangeImageFilters = register<Partial<ImageHSLA>>({
       field: keyof ImageHSLA;
       isAlpha: boolean;
     }> = [
-      { label: "H", value: hsla.h, min: 0, max: 360, bg: HUE_GRADIENT, field: "h", isAlpha: false },
-      { label: "S", value: hsla.s, min: 0, max: 100, bg: satGradient, field: "s", isAlpha: false },
-      { label: "L", value: hsla.l, min: 0, max: 100, bg: "linear-gradient(to right, #000, #fff)", field: "l", isAlpha: false },
-      { label: "A", value: hsla.a, min: 0, max: 100, bg: "linear-gradient(to right, transparent, #000)", field: "a", isAlpha: true },
+      {
+        label: "H",
+        value: hsla.h,
+        min: 0,
+        max: 360,
+        bg: HUE_GRADIENT,
+        field: "h",
+        isAlpha: false,
+      },
+      {
+        label: "S",
+        value: hsla.s,
+        min: 0,
+        max: 100,
+        bg: satGradient,
+        field: "s",
+        isAlpha: false,
+      },
+      {
+        label: "L",
+        value: hsla.l,
+        min: 0,
+        max: 100,
+        bg: "linear-gradient(to right, #000, #fff)",
+        field: "l",
+        isAlpha: false,
+      },
+      {
+        label: "A",
+        value: hsla.a,
+        min: 0,
+        max: 100,
+        bg: "linear-gradient(to right, transparent, #000)",
+        field: "a",
+        isAlpha: true,
+      },
     ];
 
     return (
@@ -1615,7 +1644,10 @@ export const actionChangeCornerRadius = register<number>({
         }
 
         const maxRadius = Math.min(el.width, el.height) / 2;
-        const radiusValue = Math.max(0, Math.min(Math.round(value), Math.floor(maxRadius)));
+        const radiusValue = Math.max(
+          0,
+          Math.min(Math.round(value), Math.floor(maxRadius)),
+        );
 
         return newElementWith(el, {
           roundness: {
@@ -1642,12 +1674,10 @@ export const actionChangeCornerRadius = register<number>({
       return null;
     }
 
-    const commonValue = reduceToCommonValue(
-      adaptiveElements,
-      (el) =>
-        el.roundness?.type === ROUNDNESS.ADAPTIVE_RADIUS
-          ? el.roundness.value ?? DEFAULT_ADAPTIVE_RADIUS
-          : null,
+    const commonValue = reduceToCommonValue(adaptiveElements, (el) =>
+      el.roundness?.type === ROUNDNESS.ADAPTIVE_RADIUS
+        ? el.roundness.value ?? DEFAULT_ADAPTIVE_RADIUS
+        : null,
     );
 
     const displayValue = commonValue ?? DEFAULT_ADAPTIVE_RADIUS;
@@ -1706,15 +1736,10 @@ export const actionChangeRoundness = register<"sharp" | "round">({
       elements,
       app,
       (element) =>
-        hasLegacyRoundness
-          ? null
-          : element.roundness
-          ? "round"
-          : "sharp",
+        hasLegacyRoundness ? null : element.roundness ? "round" : "sharp",
       (element) =>
         !isArrowElement(element) && element.hasOwnProperty("roundness"),
-      (hasSelection) =>
-        hasSelection ? null : appState.currentItemRoundness,
+      (hasSelection) => (hasSelection ? null : appState.currentItemRoundness),
     );
 
     const hasAdaptiveRadiusElements = targetElements.some((el) =>

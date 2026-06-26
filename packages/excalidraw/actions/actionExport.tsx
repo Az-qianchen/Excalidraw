@@ -5,7 +5,10 @@ import {
   THEME,
 } from "@excalidraw/common";
 
-import { getNonDeletedElements, hashElementsVersion } from "@excalidraw/element";
+import {
+  getNonDeletedElements,
+  hashElementsVersion,
+} from "@excalidraw/element";
 
 import { CaptureUpdateAction } from "@excalidraw/element";
 
@@ -21,7 +24,11 @@ import { Tooltip } from "../components/Tooltip";
 import { ExportIcon, questionCircle, saveAs } from "../components/icons";
 import { loadFromJSON, saveAsJSON } from "../data";
 import { isImageFileHandle } from "../data/blob";
-import { nativeFileSystemSupported, saveFileHandleToIDB, ensureFileHandlePermission } from "../data/filesystem";
+import {
+  nativeFileSystemSupported,
+  saveFileHandleToIDB,
+  ensureFileHandlePermission,
+} from "../data/filesystem";
 
 import { resaveAsImageWithScene } from "../data/resave";
 
@@ -323,7 +330,9 @@ export const actionSaveToActiveFile = register({
 
     try {
       if (previousFileHandle && !isImageFileHandle(previousFileHandle)) {
-        const hasPermission = await ensureFileHandlePermission(previousFileHandle);
+        const hasPermission = await ensureFileHandlePermission(
+          previousFileHandle,
+        );
         if (!hasPermission) {
           await saveFileHandleToIDB(null);
           return {
@@ -488,7 +497,9 @@ export const actionLoadScene = register({
           name:
             loadedAppState.fileHandle?.name?.replace(/\.excalidraw$/, "") ??
             loadedAppState.name,
-          lastSavedElementsHash: hashElementsVersion(loadedElements.filter((el) => !el.isDeleted)),
+          lastSavedElementsHash: hashElementsVersion(
+            loadedElements.filter((el) => !el.isDeleted),
+          ),
         },
         files,
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,

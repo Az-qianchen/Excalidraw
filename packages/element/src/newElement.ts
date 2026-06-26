@@ -27,6 +27,8 @@ import { wrapText } from "./textWrapping";
 
 import { isLineElement } from "./typeChecks";
 
+import { DEFAULT_IMAGE_HSLA } from "./types";
+
 import type {
   ExcalidrawElement,
   ExcalidrawImageElement,
@@ -49,7 +51,6 @@ import type {
   ExcalidrawElbowArrowElement,
   ExcalidrawLineElement,
 } from "./types";
-import { DEFAULT_IMAGE_HSLA } from "./types";
 
 export type ElementConstructorOpts = MarkOptional<
   Omit<ExcalidrawGenericElement, "id" | "type" | "isDeleted" | "updated">,

@@ -432,6 +432,8 @@ export const DEFAULT_ELEMENT_PROPS: {
 
 export const LIBRARY_SIDEBAR_TAB = "library";
 export const CANVAS_SEARCH_TAB = "search";
+export const LAYERS_SIDEBAR_TAB = "layers";
+export const FILES_SIDEBAR_TAB = "files";
 
 export const DEFAULT_SIDEBAR = {
   name: "default",

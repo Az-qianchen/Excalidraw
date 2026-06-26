@@ -24,6 +24,7 @@ import { useEditorInterface, useExcalidrawSetAppState } from "../App";
 import { Island } from "../Island";
 
 import { SidebarHeader } from "./SidebarHeader";
+import { SidebarResizeHandle } from "./SidebarResizeHandle";
 import { SidebarTabTrigger } from "./SidebarTabTrigger";
 import { SidebarTabTriggers } from "./SidebarTabTriggers";
 import { SidebarTrigger } from "./SidebarTrigger";
@@ -150,6 +151,7 @@ export const SidebarInner = forwardRef(
         )}
         ref={islandRef}
       >
+        {docked && <SidebarResizeHandle />}
         <SidebarPropsContext.Provider value={headerPropsRef.current}>
           {children}
         </SidebarPropsContext.Provider>

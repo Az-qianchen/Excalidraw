@@ -22,7 +22,11 @@ export const actionAutoCrop = register({
   trackEvent: { category: "menu", action: "autoCrop" },
   keywords: ["image", "crop", "trim", "whitespace", "transparent"],
   predicate: (elements, appState, _, app) => {
-    if (appState.croppingElementId || appState.maskingElementId || appState.magicWandElementId) {
+    if (
+      appState.croppingElementId ||
+      appState.maskingElementId ||
+      appState.magicWandElementId
+    ) {
       return false;
     }
     const selectedElements = app.scene.getSelectedElements(appState);
@@ -30,11 +34,7 @@ export const actionAutoCrop = register({
       return false;
     }
     const el = selectedElements[0];
-    return (
-      isImageElement(el) &&
-      isInitializedImageElement(el) &&
-      !el.locked
-    );
+    return isImageElement(el) && isInitializedImageElement(el) && !el.locked;
   },
   perform(elements, appState, _, app) {
     const el = app.scene.getSelectedElements({

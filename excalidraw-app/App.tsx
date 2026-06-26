@@ -580,7 +580,8 @@ const ExcalidrawWrapper = () => {
           if (localDataState.appState) {
             const { fileHandle: _fileHandle, ...restAppState } =
               localDataState.appState;
-            localDataState.appState = restAppState as typeof localDataState.appState;
+            localDataState.appState =
+              restAppState as typeof localDataState.appState;
           }
           excalidrawAPI.updateScene({
             ...localDataState,

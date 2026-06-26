@@ -448,7 +448,21 @@ type Element<T extends DrawingToolName> = T extends "line" | "freedraw"
 
 export class UI {
   static clickTool = (toolName: ToolType | "lock") => {
-    fireEvent.click(GlobalTestState.renderResult.getByToolName(toolName));
+    try {
+      fireEvent.click(GlobalTestState.renderResult.getByToolName(toolName));
+    } catch (e: any) {
+      // tool might be in the "extra tools" dropdown menu — open it first
+      const extraToolsTrigger = document.querySelector(
+        '[data-testid="toolbar-extraTools"]',
+      );
+      if (extraToolsTrigger) {
+        fireEvent.click(extraToolsTrigger);
+        // re-attempt after the dropdown opens
+        fireEvent.click(GlobalTestState.renderResult.getByToolName(toolName));
+      } else {
+        throw e;
+      }
+    }
   };
 
   static clickLabeledElement = (label: string) => {

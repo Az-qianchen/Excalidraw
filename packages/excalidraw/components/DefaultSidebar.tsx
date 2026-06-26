@@ -3,23 +3,24 @@ import clsx from "clsx";
 import {
   CANVAS_SEARCH_TAB,
   DEFAULT_SIDEBAR,
+  FILES_SIDEBAR_TAB,
+  LAYERS_SIDEBAR_TAB,
   LIBRARY_SIDEBAR_TAB,
-  composeEventHandlers,
 } from "@excalidraw/common";
 
 import type { MarkOptional, Merge } from "@excalidraw/common/utility-types";
 
 import { useTunnels } from "../context/tunnels";
-import { useUIAppState } from "../context/ui-appState";
 
 import "../components/dropdownMenu/DropdownMenu.scss";
 
-import { useExcalidrawSetAppState } from "./App";
+import { FilesMenu } from "./FilesMenu";
+import { LayersMenu } from "./LayersMenu";
 import { LibraryMenu } from "./LibraryMenu";
 import { SearchMenu } from "./SearchMenu";
 import { Sidebar } from "./Sidebar/Sidebar";
 import { withInternalFallback } from "./hoc/withInternalFallback";
-import { LibraryIcon, searchIcon } from "./icons";
+import { folderIcon, layersIcon, LibraryIcon, searchIcon } from "./icons";
 
 import type { SidebarProps, SidebarTriggerProps } from "./Sidebar/common";
 
@@ -69,12 +70,7 @@ export const DefaultSidebar = Object.assign(
         onDock?: SidebarProps["onDock"] | false;
       }
     >) => {
-      const appState = useUIAppState();
-      const setAppState = useExcalidrawSetAppState();
-
       const { DefaultSidebarTabTriggersTunnel } = useTunnels();
-
-      const isForceDocked = appState.openSidebar?.tab === CANVAS_SEARCH_TAB;
 
       return (
         <Sidebar
@@ -82,19 +78,7 @@ export const DefaultSidebar = Object.assign(
           name="default"
           key="default"
           className={clsx("default-sidebar", className)}
-          docked={
-            isForceDocked || (docked ?? appState.defaultSidebarDockedPreference)
-          }
-          onDock={
-            // `onDock=false` disables docking.
-            // if `docked` passed, but no onDock passed, disable manual docking.
-            isForceDocked || onDock === false || (!onDock && docked != null)
-              ? undefined
-              : // compose to allow the host app to listen on default behavior
-                composeEventHandlers(onDock, (docked) => {
-                  setAppState({ defaultSidebarDockedPreference: docked });
-                })
-          }
+          docked={true}
         >
           <Sidebar.Tabs>
             <Sidebar.Header>
@@ -105,6 +89,12 @@ export const DefaultSidebar = Object.assign(
                 <Sidebar.TabTrigger tab={LIBRARY_SIDEBAR_TAB}>
                   {LibraryIcon}
                 </Sidebar.TabTrigger>
+                <Sidebar.TabTrigger tab={LAYERS_SIDEBAR_TAB}>
+                  {layersIcon}
+                </Sidebar.TabTrigger>
+                <Sidebar.TabTrigger tab={FILES_SIDEBAR_TAB}>
+                  {folderIcon}
+                </Sidebar.TabTrigger>
                 <DefaultSidebarTabTriggersTunnel.Out />
               </Sidebar.TabTriggers>
             </Sidebar.Header>
@@ -113,6 +103,12 @@ export const DefaultSidebar = Object.assign(
             </Sidebar.Tab>
             <Sidebar.Tab tab={CANVAS_SEARCH_TAB}>
               <SearchMenu />
+            </Sidebar.Tab>
+            <Sidebar.Tab tab={LAYERS_SIDEBAR_TAB}>
+              <LayersMenu />
+            </Sidebar.Tab>
+            <Sidebar.Tab tab={FILES_SIDEBAR_TAB}>
+              <FilesMenu />
             </Sidebar.Tab>
             {children}
           </Sidebar.Tabs>

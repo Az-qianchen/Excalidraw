@@ -65,6 +65,7 @@ exports[`exportToSvg > with default arguments 1`] = `
   "isResizing": false,
   "isRotating": false,
   "lastPointerDownWith": "mouse",
+  "lastSavedElementsHash": null,
   "lockedMultiSelections": {},
   "magicWandContiguous": true,
   "magicWandElementId": null,

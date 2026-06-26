@@ -50,7 +50,9 @@ export const StrokeWidthInput = ({
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
-    if (disabled || value === null) return;
+    if (disabled || value === null) {
+      return;
+    }
 
     e.preventDefault();
     const delta = e.deltaY > 0 ? -1 : 1;
@@ -59,7 +61,9 @@ export const StrokeWidthInput = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (disabled || value === null) return;
+    if (disabled || value === null) {
+      return;
+    }
 
     if (e.key === KEYS.ENTER) {
       commitValue(inputValue);
@@ -79,7 +83,9 @@ export const StrokeWidthInput = ({
   };
 
   const handleBlur = () => {
-    if (disabled || value === null) return;
+    if (disabled || value === null) {
+      return;
+    }
     commitValue(inputValue);
   };
 

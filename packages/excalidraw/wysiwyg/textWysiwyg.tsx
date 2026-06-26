@@ -63,16 +63,17 @@ import {
   actionZoomOut,
 } from "../actions/actionCanvas";
 
-import type { ParsedDataTranferList } from "../clipboard";
-
-import type App from "../components/App";
-import type { AppState } from "../types";
 import {
   registerTextEditor,
   unregisterTextEditor,
   applyColorToSpans,
   updateSpansOnTextChange,
 } from "./textEditorState";
+
+import type { ParsedDataTranferList } from "../clipboard";
+
+import type App from "../components/App";
+import type { AppState } from "../types";
 
 const getTransform = (
   width: number,
@@ -305,7 +306,8 @@ export const textWysiwyg = ({
       // Make sure text editor height doesn't go beyond viewport
       const editorMaxHeight =
         (appState.height - viewportY) / appState.zoom.value;
-      const hasSpans = updatedTextElement.spans && updatedTextElement.spans.length > 0;
+      const hasSpans =
+        updatedTextElement.spans && updatedTextElement.spans.length > 0;
       Object.assign(editable.style, {
         font,
         // must be defined *after* font ¯\_(ツ)_/¯
@@ -327,8 +329,8 @@ export const textWysiwyg = ({
         color: hasSpans
           ? "transparent"
           : appState.theme === THEME.DARK
-            ? applyDarkModeFilter(updatedTextElement.strokeColor)
-            : updatedTextElement.strokeColor,
+          ? applyDarkModeFilter(updatedTextElement.strokeColor)
+          : updatedTextElement.strokeColor,
         caretColor: hasSpans
           ? appState.theme === THEME.DARK
             ? "#fff"
@@ -637,7 +639,11 @@ export const textWysiwyg = ({
       // IME 组合输入期间跳过 span 更新，避免破坏格式追踪
       if (!isComposing) {
         const updatedElement = app.scene.getElement<ExcalidrawTextElement>(id);
-        if (updatedElement && isTextElement(updatedElement) && updatedElement.spans) {
+        if (
+          updatedElement &&
+          isTextElement(updatedElement) &&
+          updatedElement.spans
+        ) {
           const newSpans = updateSpansOnTextChange(
             previousText,
             editable.value,

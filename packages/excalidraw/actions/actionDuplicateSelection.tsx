@@ -1,8 +1,4 @@
-import {
-  KEYS,
-  MOBILE_ACTION_BUTTON_BG,
-  arrayToMap,
-} from "@excalidraw/common";
+import { KEYS, MOBILE_ACTION_BUTTON_BG, arrayToMap } from "@excalidraw/common";
 
 import { getNonDeletedElements } from "@excalidraw/element";
 

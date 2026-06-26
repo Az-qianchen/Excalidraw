@@ -71,10 +71,18 @@ export function floodFillMask(
       if (dr <= threshold && dg <= threshold && db <= threshold) {
         const pos = py * width + px;
         data[pos] = 1;
-        if (px < minX) minX = px;
-        if (py < minY) minY = py;
-        if (px > maxX) maxX = px;
-        if (py > maxY) maxY = py;
+        if (px < minX) {
+          minX = px;
+        }
+        if (py < minY) {
+          minY = py;
+        }
+        if (px > maxX) {
+          maxX = px;
+        }
+        if (py > maxY) {
+          maxY = py;
+        }
       }
     }
   }
@@ -134,9 +142,7 @@ export function applyMaskToImage(
 /**
  * 反转掩码（选区内外互换）。
  */
-export function invertMask(
-  mask: MagicWandMask | null,
-): MagicWandMask | null {
+export function invertMask(mask: MagicWandMask | null): MagicWandMask | null {
   if (!mask) {
     return null;
   }
@@ -192,10 +198,18 @@ function computeMaskBounds(
     for (let x = 0; x < width; x++) {
       const idx = rowOffset + x;
       if (data[idx]) {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
+        if (x < minX) {
+          minX = x;
+        }
+        if (y < minY) {
+          minY = y;
+        }
+        if (x > maxX) {
+          maxX = x;
+        }
+        if (y > maxY) {
+          maxY = y;
+        }
       }
     }
   }
@@ -208,10 +222,7 @@ function computeMaskBounds(
 }
 
 /** 羽化掩码边缘（高斯模糊近似） */
-function featherMask(
-  mask: MagicWandMask,
-  radius: number,
-): Float32Array {
+function featherMask(mask: MagicWandMask, radius: number): Float32Array {
   const { width, height, data } = mask;
   const total = width * height;
   const base = new Float32Array(total);

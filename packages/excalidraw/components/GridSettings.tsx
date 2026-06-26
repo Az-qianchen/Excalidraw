@@ -1,17 +1,19 @@
 import { useState } from "react";
 
+import { Popover } from "radix-ui";
+
 import { getNormalizedGridSize, getNormalizedGridStep } from "../scene";
 import { t } from "../i18n";
+
 import { gridIcon } from "./icons";
 import { ToolButton } from "./ToolButton";
-import { Popover } from "radix-ui";
 import { PropertiesPopover } from "./PropertiesPopover";
 import { useExcalidrawContainer } from "./App";
 import { StrokeWidthInput } from "./StrokeWidthInput";
 
-import type { AppClassProperties, UIAppState } from "../types";
-
 import "./GridSettings.scss";
+
+import type { AppClassProperties, UIAppState } from "../types";
 
 export const GridSettings = ({
   app,
