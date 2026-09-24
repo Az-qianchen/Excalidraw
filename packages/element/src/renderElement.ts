@@ -650,6 +650,10 @@ const drawElementOnCanvas = (
               }
             }
 
+            // span 手动布局以 x 为各 span 的左端点，必须覆盖外层
+            // element.textAlign 设置的 center/right，否则 fillText 会把
+            // x 解释为 span 中点/右端点，导致局部改色后文字错位。
+            context.textAlign = "left";
             for (const span of lineSpans) {
               const spanColor = span.color || element.strokeColor;
               context.fillStyle =
