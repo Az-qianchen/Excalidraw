@@ -75,6 +75,7 @@ import type {
   ExcalidrawTextElement,
   FontFamilyValues,
   ImageHSLA,
+  OuterGlow,
   TextAlign,
   VerticalAlign,
 } from "@excalidraw/element/types";
@@ -89,6 +90,7 @@ import { ColorPicker } from "../components/ColorPicker/ColorPicker";
 import { FontPicker } from "../components/FontPicker/FontPicker";
 import { IconPicker } from "../components/IconPicker";
 import { Range } from "../components/Range";
+import { Switch } from "../components/Switch";
 import { StrokeWidthInput } from "../components/StrokeWidthInput";
 import {
   HSLASliderRow,
@@ -764,6 +766,168 @@ export const actionChangeOpacity = register<ExcalidrawElement["opacity"]>({
         step={1}
         testId="opacity"
       />
+    );
+  },
+});
+
+export const DEFAULT_OUTER_GLOW: Required<OuterGlow> = {
+  enabled: false,
+  color: "#4dabf7ff",
+  width: 16,
+  strength: 50,
+  hardEdge: false,
+};
+
+// 外发光：颜色(含alpha) + 宽度 + 实度（衰减曲线陡峭度）+ 硬边外扩开关。
+// 硬边仅对形状/线条/文字（有原生 stroke 支持）可选；图片回退软发光。
+export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
+  name: "changeOuterGlow",
+  label: "labels.outerGlow",
+  trackEvent: false,
+  perform: (elements, appState, value) => {
+    return {
+      elements: changeProperty(
+        elements,
+        appState,
+        (el) => {
+          const current = el.outerGlow ?? DEFAULT_OUTER_GLOW;
+          return newElementWith(el, {
+            outerGlow: { ...current, ...value },
+          });
+        },
+        true,
+      ),
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    };
+  },
+  PanelComponent: ({ elements, appState, app, updateData }) => {
+    // 手动提取公共 outerGlow 值（getFormValue 仅支持 Primitive）
+    const editingTextElement = app.state.editingTextElement;
+    const targetElements = editingTextElement
+      ? [editingTextElement as ExcalidrawElement]
+      : app.scene.getSelectedElements(app.state);
+    let glow: Required<OuterGlow> | null = null;
+    if (targetElements.length) {
+      let common: Required<OuterGlow> | null = null;
+      for (const el of targetElements) {
+        const g = el.outerGlow ?? DEFAULT_OUTER_GLOW;
+        if (common === null) {
+          common = { ...g };
+        } else if (
+          common.enabled !== g.enabled ||
+          common.color !== g.color ||
+          common.width !== g.width ||
+          common.strength !== g.strength ||
+          common.hardEdge !== g.hardEdge
+        ) {
+          common = null;
+          break;
+        }
+      }
+      glow = common;
+    }
+    if (!glow) {
+      glow = { ...DEFAULT_OUTER_GLOW };
+    }
+
+    // 从 hex8 提取 alpha 百分比（0-100）
+    const alphaHex = glow.color.slice(7, 9) || "ff";
+    const alphaPercent = Math.round(
+      (parseInt(alphaHex, 16) / 255) * 100,
+    );
+
+    // hex → "#rrggbb"
+    const hexColor = glow.color.slice(0, 7);
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div data-testid="outer-glow-toggle">
+          <label
+            htmlFor="outer-glow-enabled-switch"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+            }}
+          >
+            {t("labels.outerGlow")}
+            <Switch
+              name="outer-glow-enabled-switch"
+              checked={glow.enabled}
+              onChange={(checked) => updateData({ enabled: checked })}
+            />
+          </label>
+        </div>
+        {glow.enabled && (
+          <>
+            <ColorPicker
+              type="elementOuterGlow"
+              label={t("labels.outerGlowColor")}
+              color={hexColor}
+              onChange={(color) => {
+                // 保留原 alpha，拼回 hex8
+                updateData({ color: color + alphaHex });
+              }}
+              elements={elements}
+              appState={appState}
+              updateData={updateData}
+              topPicks={DEFAULT_ELEMENT_STROKE_PICKS}
+              palette={DEFAULT_ELEMENT_STROKE_COLOR_PALETTE}
+            />
+            <Range
+              label={t("labels.outerGlowAlpha")}
+              value={alphaPercent}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(v) => {
+                const a = Math.round((v / 100) * 255)
+                  .toString(16)
+                  .padStart(2, "0");
+                updateData({ color: hexColor + a });
+              }}
+              testId="outer-glow-alpha"
+            />
+            <Range
+              label={t("labels.outerGlowWidth")}
+              value={glow.width}
+              min={0}
+              max={60}
+              step={1}
+              onChange={(v) => updateData({ width: v })}
+              testId="outer-glow-width"
+            />
+            <Range
+              label={t("labels.outerGlowStrength")}
+              value={glow.strength}
+              min={0}
+              max={99}
+              step={1}
+              onChange={(v) => updateData({ strength: v })}
+              testId="outer-glow-strength"
+            />
+            <div data-testid="outer-glow-hard-edge">
+              <label
+                htmlFor="outer-glow-hard-edge-switch"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  cursor: "pointer",
+                }}
+              >
+                {t("labels.outerGlowHardEdge")}
+                <Switch
+                  name="outer-glow-hard-edge-switch"
+                  checked={glow.hardEdge}
+                  onChange={(checked) => updateData({ hardEdge: checked })}
+                />
+              </label>
+            </div>
+          </>
+        )}
+      </div>
     );
   },
 });

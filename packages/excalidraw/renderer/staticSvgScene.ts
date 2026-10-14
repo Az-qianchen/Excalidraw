@@ -46,6 +46,11 @@ import {
 
 import { getElementAbsoluteCoords } from "@excalidraw/element";
 import { splitSpansIntoLines } from "@excalidraw/element";
+import {
+  createSoftGlowFilter,
+  createHardEdgeImageFilter,
+} from "./svgOuterGlow";
+import type { OuterGlow } from "@excalidraw/element/types";
 
 import type {
   ExcalidrawElement,
@@ -150,6 +155,45 @@ const renderElementToSvg = (
       element.opacity) /
     10000;
 
+  const doc = svgRoot.ownerDocument;
+
+  /**
+   * 为带 outerGlow 的元素生成 SVG 发光层节点（垫在主体节点之前）。
+   * - 形状/线条/文字 + 软发光：克隆主体节点套 soft glow filter
+   * - 图片 + 软发光：克隆 <use> 图节点套 soft glow filter
+   * - 形状/文字 + 硬边：克隆主体节点，加粗 stroke、设 glow 颜色、fill=none
+   * - 图片 + 硬边：克隆图节点套 feMorphology dilate filter
+   * 返回 null 表示无发光。
+   */
+  const createGlowNode = (
+    mainNode: SVGElement,
+    glow: OuterGlow,
+    isImage: boolean,
+    strokeWidthForHardEdge?: number,
+  ): SVGElement | null => {
+    const clone = mainNode.cloneNode(true) as SVGElement;
+    if (glow.hardEdge && !isImage) {
+      // 硬边：直接克隆主体并加粗描边（无 filter，精确矢量）
+      clone.setAttribute("stroke", glow.color);
+      clone.setAttribute(
+        "stroke-width",
+        `${strokeWidthForHardEdge ?? glow.width * 2 + 2}`,
+      );
+      clone.setAttribute("fill", "none");
+      clone.removeAttribute("stroke-opacity");
+      return clone;
+    }
+    // 软发光或图片硬边（feMorphology）
+    let filterId: string;
+    if (glow.hardEdge && isImage) {
+      filterId = createHardEdgeImageFilter(doc, svgRoot, element.id, glow);
+    } else {
+      filterId = createSoftGlowFilter(doc, svgRoot, element.id, glow);
+    }
+    clone.setAttribute("filter", `url(#${filterId})`);
+    return clone;
+  };
+
   switch (element.type) {
     case "selection": {
       // Since this is used only during editing experience, which is canvas based,
@@ -177,15 +221,33 @@ const renderElementToSvg = (
         }) rotate(${degree} ${cx} ${cy})`,
       );
 
+      // 外发光层垫在主体之前
+      const glowNode = element.outerGlow?.enabled
+        ? createGlowNode(
+            node,
+            element.outerGlow,
+            false,
+            element.outerGlow.width * 2 + element.strokeWidth,
+          )
+        : null;
+      const nodesToWrap = glowNode ? [glowNode, node] : [node];
+
       const g = maybeWrapNodesInFrameClipPath(
         element,
         root,
-        [node],
+        nodesToWrap,
         renderConfig.frameRendering,
         elementsMap,
       );
 
-      addToRoot(g || node, element);
+      if (g) {
+        addToRoot(g, element);
+      } else {
+        if (glowNode) {
+          addToRoot(glowNode, element);
+        }
+        addToRoot(node, element);
+      }
       break;
     }
     case "iframe":
@@ -369,10 +431,20 @@ const renderElementToSvg = (
         group.appendChild(node);
       });
 
+      // 外发光层：克隆整个 group（含 transform）套 filter / 加粗描边
+      const glowNode = element.outerGlow?.enabled
+        ? createGlowNode(
+            group,
+            element.outerGlow,
+            false,
+            element.outerGlow.width * 2 + element.strokeWidth,
+          )
+        : null;
+
       const g = maybeWrapNodesInFrameClipPath(
         element,
         root,
-        [group, maskPath],
+        glowNode ? [glowNode, group, maskPath] : [group, maskPath],
         renderConfig.frameRendering,
         elementsMap,
       );
@@ -380,6 +452,9 @@ const renderElementToSvg = (
         addToRoot(g, element);
         root.appendChild(g);
       } else {
+        if (glowNode) {
+          addToRoot(glowNode, element);
+        }
         addToRoot(group, element);
         root.append(maskPath);
       }
@@ -434,15 +509,32 @@ const renderElementToSvg = (
       );
       wrapper.setAttribute("stroke", "none");
 
+      // 外发光层（软发光 filter / 硬边加粗描边）
+      const glowNode = element.outerGlow?.enabled
+        ? createGlowNode(
+            wrapper,
+            element.outerGlow,
+            false,
+            element.outerGlow.width * 2 + element.strokeWidth,
+          )
+        : null;
+
       const g = maybeWrapNodesInFrameClipPath(
         element,
         root,
-        [wrapper],
+        glowNode ? [glowNode, wrapper] : [wrapper],
         renderConfig.frameRendering,
         elementsMap,
       );
 
-      addToRoot(g || wrapper, element);
+      if (g) {
+        addToRoot(g, element);
+      } else {
+        if (glowNode) {
+          addToRoot(glowNode, element);
+        }
+        addToRoot(wrapper, element);
+      }
       break;
     }
     case "image": {
@@ -624,6 +716,18 @@ const renderElementToSvg = (
           renderConfig.frameRendering,
           elementsMap,
         );
+
+        // 外发光层：克隆图节点（软发光 filter 或 feMorphology dilate）
+        if (element.outerGlow?.enabled) {
+          const glowNode = createGlowNode(g, element.outerGlow, true);
+          if (glowNode) {
+            if (clipG) {
+              clipG.insertBefore(glowNode, g);
+            } else {
+              root.insertBefore(glowNode, g);
+            }
+          }
+        }
         addToRoot(clipG || g, element);
       }
       break;
@@ -770,12 +874,37 @@ const renderElementToSvg = (
         const g = maybeWrapNodesInFrameClipPath(
           element,
           root,
-          [node],
+          element.outerGlow?.enabled
+            ? [
+                createGlowNode(
+                  node,
+                  element.outerGlow,
+                  false,
+                  element.outerGlow.width * 2 + element.fontSize / 4,
+                )!,
+                node,
+              ]
+            : [node],
           renderConfig.frameRendering,
           elementsMap,
         );
 
-        addToRoot(g || node, element);
+        if (g) {
+          addToRoot(g, element);
+        } else if (element.outerGlow?.enabled) {
+          const glowNode = createGlowNode(
+            node,
+            element.outerGlow,
+            false,
+            element.outerGlow.width * 2 + element.fontSize / 4,
+          );
+          if (glowNode) {
+            addToRoot(glowNode, element);
+          }
+          addToRoot(node, element);
+        } else {
+          addToRoot(node, element);
+        }
       } else {
         // @ts-ignore
         throw new Error(`Unimplemented type ${element.type}`);

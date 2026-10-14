@@ -65,6 +65,7 @@ import {
 } from "./typeChecks";
 import { getContainingFrame } from "./frame";
 import { getCornerRadius } from "./utils";
+import { getCurvePathOps } from "@excalidraw/utils/shape";
 
 import {
   ShapeCache,
@@ -75,6 +76,7 @@ import {
 
 import { DEFAULT_IMAGE_HSLA } from "./types";
 import { splitSpansIntoLines } from "./textElement";
+import { renderOuterGlow, renderHardEdgeFromSilhouette } from "./outerGlow";
 
 import type {
   ExcalidrawElement,
@@ -87,9 +89,11 @@ import type {
   NonDeletedSceneElementsMap,
   ElementsMap,
   ImageHSLA,
+  OuterGlow,
 } from "./types";
 
 import type { RoughCanvas } from "roughjs/bin/canvas";
+import type { Drawable } from "roughjs/bin/core";
 
 const isPendingImageElement = (
   element: ExcalidrawElement,
@@ -99,19 +103,29 @@ const isPendingImageElement = (
   !renderConfig.imageCache.has(element.fileId);
 
 const getCanvasPadding = (element: ExcalidrawElement) => {
-  switch (element.type) {
-    case "freedraw":
-      return element.strokeWidth * 12;
-    case "text":
-      return element.fontSize / 2;
-    case "arrow":
-      if (element.endArrowhead || element.endArrowhead) {
-        return Math.max(40, element.strokeWidth / 2);
-      }
-      return Math.max(20, element.strokeWidth / 2);
-    default:
-      return Math.max(20, (element.strokeWidth ?? 0) / 2);
-  }
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
+  const glowPadding = element.outerGlow?.enabled
+    ? // 硬边外扩半径 = width（描边居中），软发光模糊半径 = width。
+      // padding 需匹配 canvas 像素，而发光半径在 canvas 上为
+      // width * dpr * scale，取 2 倍 width * dpr 确保不裁边
+      (element.outerGlow.width * 2 + (element.strokeWidth ?? 0)) * dpr
+    : 0;
+  const base = (() => {
+    switch (element.type) {
+      case "freedraw":
+        return element.strokeWidth * 12;
+      case "text":
+        return element.fontSize / 2;
+      case "arrow":
+        if (element.endArrowhead || element.endArrowhead) {
+          return Math.max(40, element.strokeWidth / 2);
+        }
+        return Math.max(20, element.strokeWidth / 2);
+      default:
+        return Math.max(20, (element.strokeWidth ?? 0) / 2);
+    }
+  })();
+  return Math.max(base, glowPadding);
 };
 
 export const getRenderOpacity = (
@@ -152,6 +166,8 @@ export interface ExcalidrawElementWithCanvas {
   boundTextElementVersion: number | null;
   imageCrop: ExcalidrawImageElement["crop"] | null;
   containingFrameOpacity: number;
+  /** 元素 outerGlow 属性的签名（JSON 序列化），变化时重建缓存画布 */
+  outerGlowSignature: string | null;
   boundTextCanvas: HTMLCanvasElement;
   imageHSLA: ExcalidrawImageElement["imageHSLA"] | null;
 }
@@ -211,6 +227,116 @@ const cappedElementCanvasSize = (
   return { width, height, scale };
 };
 
+/**
+ * 带发光效果绘制元素：先画主体取 alpha silhouette，再合成发光层
+ * （软发光或硬边膨胀），最后盖回主体。供交互渲染缓存与导出共用。
+ *
+ * 调用时 context 必须已处于"场景单位"坐标系（与 drawElementOnCanvas
+ * 一致）。pixelRatio 为该画布上"像素 / 场景单位"之比
+ * （交互缓存画布 = dpr × zoom，导出画布 = exportScale），
+ * 供 silhouette 像素空间合成时换算发光半径。
+ */
+const drawElementWithGlow = (
+  element: NonDeletedExcalidrawElement,
+  rc: RoughCanvas,
+  context: CanvasRenderingContext2D,
+  renderConfig: StaticCanvasRenderConfig,
+  elementsMap: ElementsMap,
+  glow: OuterGlow,
+  pixelRatio: number,
+) => {
+  if (glow.hardEdge && !isImageElement(element)) {
+    // 硬边外扩（形状/线条/文字，原生矢量描边）：
+    // 先以加粗 lineWidth 描一层同形状轮廓作为外扩层，
+    // 再画元素主体盖上。lineWidth 以场景单位计（变换自动缩放）。
+    context.save();
+    context.lineJoin = "round";
+    context.lineCap = "round";
+    context.strokeStyle = glow.color;
+    context.lineWidth = glow.width * 2 + (element.strokeWidth ?? 2);
+    if (isTextElement(element)) {
+      // 文字硬边：strokeText，坐标系与 drawElementOnCanvas 文字分支相同
+      drawTextOutlineOnly = true;
+      try {
+        drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
+      } finally {
+        drawTextOutlineOnly = false;
+      }
+    } else {
+      // 形状/线条：硬边外扩不能用 rc.draw()——roughjs 的 Drawable
+      // 把 strokeWidth/stroke 固化在 shape 内部，不读取外部 context 状态。
+      // 改为从 shape 提取路径 ops 重建 Path2D，用原生 context.stroke()
+      // 按外部 lineWidth/strokeStyle 描边，得到精确的等距外扩。
+      const shapes = ShapeCache.generateElementShape(
+        element as Parameters<typeof ShapeCache.generateElementShape>[0],
+        renderConfig,
+      ) as unknown as (Drawable | string)[] | Drawable | null;
+      if (shapes) {
+        const shapeList = Array.isArray(shapes) ? shapes : [shapes];
+        for (const shape of shapeList) {
+          if (typeof shape === "string") {
+            // freedraw 路径：构造 Path2D 手动描边
+            context.stroke(new Path2D(shape));
+          } else if (shape) {
+            const path = new Path2D();
+            for (const op of getCurvePathOps(shape)) {
+              const data = op.data;
+              switch (op.op) {
+                case "move":
+                  path.moveTo(data[0], data[1]);
+                  break;
+                case "lineTo":
+                  path.lineTo(data[0], data[1]);
+                  break;
+                case "bcurveTo": {
+                  // roughjs 三次贝塞尔：6 个控制点
+                  path.bezierCurveTo(
+                    data[0],
+                    data[1],
+                    data[2],
+                    data[3],
+                    data[4],
+                    data[5],
+                  );
+                  break;
+                }
+              }
+            }
+            context.stroke(path);
+          }
+        }
+      }
+    }
+    context.restore();
+
+    // 主体
+    drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
+  } else {
+    // 软发光（所有元素类型）与图片硬边外扩（膨胀近似）：
+    // 都基于渲染后的 alpha silhouette 合成
+    const silhouette = document.createElement("canvas");
+    silhouette.width = context.canvas.width;
+    silhouette.height = context.canvas.height;
+    const sctx = silhouette.getContext("2d")!;
+    context.save();
+    drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
+    context.restore();
+    sctx.drawImage(context.canvas, 0, 0);
+
+    // 清空主画布，垫入发光层（软发光或硬边膨胀），再盖回主体
+    context.save();
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+    if (glow.hardEdge) {
+      renderHardEdgeFromSilhouette(context, silhouette, glow, pixelRatio);
+    } else {
+      renderOuterGlow(context, silhouette, glow, pixelRatio);
+    }
+    context.drawImage(silhouette, 0, 0);
+    context.restore();
+  }
+};
+
 const generateElementCanvas = (
   element: NonDeletedExcalidrawElement,
   elementsMap: NonDeletedSceneElementsMap,
@@ -221,6 +347,9 @@ const generateElementCanvas = (
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d")!;
   const padding = getCanvasPadding(element);
+  const outerGlow = element.outerGlow
+    ? JSON.stringify(element.outerGlow)
+    : null;
 
   const { width, height, scale } = cappedElementCanvasSize(
     element,
@@ -263,7 +392,22 @@ const generateElementCanvas = (
 
   const rc = rough.canvas(canvas);
 
-  drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
+  const glow = element.outerGlow;
+  if (glow?.enabled) {
+    // 发光合成（软发光 / 硬边外扩），与导出路径共用同一实现。
+    // 缓存画布像素/场景单位 = dpr × zoom
+    drawElementWithGlow(
+      element,
+      rc,
+      context,
+      renderConfig,
+      elementsMap,
+      glow,
+      window.devicePixelRatio * scale,
+    );
+  } else {
+    drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
+  }
 
   context.restore();
 
@@ -342,6 +486,7 @@ const generateElementCanvas = (
       getBoundTextElement(element, elementsMap)?.version || null,
     containingFrameOpacity:
       getContainingFrame(element, elementsMap)?.opacity || 100,
+    outerGlowSignature: outerGlow,
     boundTextCanvas,
     angle: element.angle,
     imageCrop: isImageElement(element) ? element.crop : null,
@@ -394,6 +539,10 @@ const drawImagePlaceholder = (
     size,
   );
 };
+
+/** 硬边外扩文字模式的模块级开关：drawElementOnCanvas 文字分支
+ * 读取它决定 strokeText 还是 fillText（仅 generateElementCanvas 使用） */
+let drawTextOutlineOnly = false;
 
 const drawElementOnCanvas = (
   element: NonDeletedExcalidrawElement,
@@ -593,6 +742,15 @@ const drawElementOnCanvas = (
             ? applyDarkModeFilter(element.strokeColor)
             : element.strokeColor;
         context.textAlign = element.textAlign as CanvasTextAlign;
+        // 硬边外扩模式：只描边不填充（strokeStyle/lineWidth 由调用方预设）
+        const outlineOnly = drawTextOutlineOnly;
+        const drawText = (text: string, x: number, y: number) => {
+          if (outlineOnly) {
+            context.strokeText(text, x, y);
+          } else {
+            context.fillText(text, x, y);
+          }
+        };
 
         // Canvas does not support multiline text by default
         const lines = element.text.replace(/\r\n?/g, "\n").split("\n");
@@ -660,13 +818,13 @@ const drawElementOnCanvas = (
                 renderConfig.theme === THEME.DARK
                   ? applyDarkModeFilter(spanColor)
                   : spanColor;
-              context.fillText(span.text, x, y);
+              drawText(span.text, x, y);
               x += context.measureText(span.text).width;
             }
           }
         } else {
           for (let index = 0; index < lines.length; index++) {
-            context.fillText(
+            drawText(
               lines[index],
               horizontalOffset,
               index * lineHeightPx + verticalOffset,
@@ -712,6 +870,7 @@ const generateElementWithCanvas = (
 
   const containingFrameOpacity =
     getContainingFrame(element, elementsMap)?.opacity || 100;
+  const outerGlow = element.outerGlow ? JSON.stringify(element.outerGlow) : null;
 
   if (
     !prevElementWithCanvas ||
@@ -721,6 +880,7 @@ const generateElementWithCanvas = (
     prevElementWithCanvas.imageCrop !== imageCrop ||
     prevElementWithCanvas.imageHSLA !== imageHSLA ||
     prevElementWithCanvas.containingFrameOpacity !== containingFrameOpacity ||
+    prevElementWithCanvas.outerGlowSignature !== outerGlow ||
     // since we rotate the canvas when copying from cached canvas, we don't
     // regenerate the cached canvas. But we need to in case of labels which are
     // cached alongside the arrow, and we want the labels to remain unrotated
@@ -1047,13 +1207,26 @@ export const renderElement = (
 
           tempCanvasContext.translate(-shiftX, -shiftY);
 
-          drawElementOnCanvas(
-            element,
-            tempRc,
-            tempCanvasContext,
-            renderConfig,
-            allElementsMap,
-          );
+          if (element.outerGlow?.enabled) {
+            // 箭头导出发光：tempCanvas 像素/场景单位 = exportScale
+            drawElementWithGlow(
+              element,
+              tempRc,
+              tempCanvasContext,
+              renderConfig,
+              allElementsMap,
+              element.outerGlow,
+              appState.exportScale,
+            );
+          } else {
+            drawElementOnCanvas(
+              element,
+              tempRc,
+              tempCanvasContext,
+              renderConfig,
+              allElementsMap,
+            );
+          }
 
           tempCanvasContext.translate(shiftX, shiftY);
 
@@ -1092,13 +1265,27 @@ export const renderElement = (
           }
 
           context.translate(-shiftX, -shiftY);
-          drawElementOnCanvas(
-            element,
-            rc,
-            context,
-            renderConfig,
-            allElementsMap,
-          );
+          if (element.outerGlow?.enabled) {
+            // 导出时同样应用发光效果（软发光 / 硬边外扩）。
+            // 导出画布像素/场景单位 = exportScale
+            drawElementWithGlow(
+              element,
+              rc,
+              context,
+              renderConfig,
+              allElementsMap,
+              element.outerGlow,
+              appState.exportScale,
+            );
+          } else {
+            drawElementOnCanvas(
+              element,
+              rc,
+              context,
+              renderConfig,
+              allElementsMap,
+            );
+          }
         }
 
         context.restore();

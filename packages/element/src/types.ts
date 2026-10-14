@@ -79,6 +79,26 @@ type _ExcalidrawElementBase = Readonly<{
   link: string | null;
   locked: boolean;
   customData?: Record<string, any>;
+  /** 外发光效果。作用于元素渲染后的 alpha 轮廓，适用于所有元素类型
+   *  （形状、文字、图片、含半透明蒙版的抠图）。
+   *  - color：rgba() 颜色，alpha 控制整体不透明度
+   *  - width：光晕扩散距离（像素，不含元素本身）
+   *  - strength：0–100，控制从实到虚的衰减曲线陡峭度；
+   *    越低衰减越快（边缘一窄圈），越高衰减越慢（全程较浓），
+   *    100 = 无衰减，硬边外扩 */
+  outerGlow?: OuterGlow | null;
+}>;
+
+export type OuterGlow = Readonly<{
+  enabled: boolean;
+  color: string;
+  width: number;
+  /** 0–100：从实到虚的衰减曲线陡峭度（软发光模式） */
+  strength: number;
+  /** 硬边外扩：无衰减实体外扩。
+   *  形状/线条/文字使用原生 ctx.stroke()/strokeText() 精确矢量偏移；
+   *  图片等位图轮廓元素使用 alpha 轮廓多方向膨胀近似 */
+  hardEdge: boolean;
 }>;
 
 export type ExcalidrawSelectionElement = _ExcalidrawElementBase & {

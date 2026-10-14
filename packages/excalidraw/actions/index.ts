@@ -14,6 +14,7 @@ export {
   actionChangeFillStyle,
   actionChangeSloppiness,
   actionChangeOpacity,
+  actionChangeOuterGlow,
   actionChangeFontSize,
   actionChangeFontFamily,
   actionChangeTextAlign,

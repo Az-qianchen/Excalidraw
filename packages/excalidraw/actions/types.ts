@@ -73,6 +73,7 @@ export type ActionName =
   | "changeArrowType"
   | "changeArrowProperties"
   | "changeOpacity"
+  | "changeOuterGlow"
   | "changeImageFilters"
   | "changeFontSize"
   | "undo"

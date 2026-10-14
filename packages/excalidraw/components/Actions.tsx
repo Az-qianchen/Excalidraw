@@ -257,6 +257,7 @@ export const SelectedShapeActions = ({
       )}
 
       {renderAction("changeOpacity")}
+      {renderAction("changeOuterGlow")}
 
       <fieldset>
         <legend>{t("labels.layers")}</legend>

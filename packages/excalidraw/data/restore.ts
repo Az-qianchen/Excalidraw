@@ -324,10 +324,36 @@ const repairBinding = <T extends ExcalidrawArrowElement>(
   return null;
 };
 
+/** 校验并归一化 outerGlow：畸形数据（协作/手改 JSON）回退为 null */
+const restoreOuterGlow = (
+  glow: unknown,
+): ExcalidrawElement["outerGlow"] => {
+  if (typeof glow !== "object" || glow === null) {
+    return null;
+  }
+  const g = glow as Record<string, unknown>;
+  if (
+    typeof g.enabled !== "boolean" ||
+    typeof g.color !== "string" ||
+    typeof g.width !== "number" ||
+    typeof g.strength !== "number" ||
+    typeof g.hardEdge !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    enabled: g.enabled,
+    color: g.color,
+    width: Math.max(0, Math.min(60, g.width)),
+    strength: Math.max(0, Math.min(99, g.strength)),
+    hardEdge: g.hardEdge,
+  };
+};
+
 const restoreElementWithProperties = <
-  T extends Required<Omit<ExcalidrawElement, "customData">> & {
+  T extends Required<Omit<ExcalidrawElement, "customData" | "outerGlow">> & {
     customData?: ExcalidrawElement["customData"];
-    /** @deprecated */
+    outerGlow?: ExcalidrawElement["outerGlow"];
     boundElementIds?: readonly ExcalidrawElement["id"][];
     /** @deprecated */
     strokeSharpness?: StrokeRoundness;
@@ -343,7 +369,9 @@ const restoreElementWithProperties = <
   > &
     Partial<Pick<ExcalidrawElement, "type" | "x" | "y" | "customData">>,
 ): T => {
-  const base: Pick<T, keyof ExcalidrawElement> = {
+  const base: Pick<T, keyof ExcalidrawElement> & {
+    outerGlow?: ExcalidrawElement["outerGlow"];
+  } = {
     type: extra.type || element.type,
     // all elements must have version > 0 so getSceneVersion() will pick up
     // newly added elements
@@ -386,6 +414,7 @@ const restoreElementWithProperties = <
     updated: element.updated ?? getUpdatedTimestamp(),
     link: element.link ? normalizeLink(element.link) : null,
     locked: element.locked ?? false,
+    outerGlow: restoreOuterGlow(element.outerGlow),
   };
 
   if ("customData" in element || "customData" in extra) {

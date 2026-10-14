@@ -51,29 +51,38 @@ export const isCustomColor = ({
 
 export const getMostUsedCustomColors = (
   elements: readonly ExcalidrawElement[],
-  type: "elementBackground" | "elementStroke",
+  type: "elementBackground" | "elementStroke" | "elementOuterGlow",
   palette: ColorPaletteCustom,
 ) => {
-  const elementColorTypeMap = {
+  const elementColorTypeMap: Record<string, string> = {
     elementBackground: "backgroundColor",
     elementStroke: "strokeColor",
+    elementOuterGlow: "outerGlow",
+  };
+
+  // outerGlow 是对象，取其 color 字段作为颜色
+  const getColor = (element: ExcalidrawElement): string | null => {
+    if (type === "elementOuterGlow") {
+      return element.outerGlow?.color ?? null;
+    }
+    const colorKey = elementColorTypeMap[type] as "backgroundColor" | "strokeColor";
+    return (element as any)[colorKey] as string;
   };
 
   const colors = elements.filter((element) => {
     if (element.isDeleted) {
       return false;
     }
-
-    const color =
-      element[elementColorTypeMap[type] as "backgroundColor" | "strokeColor"];
-
-    return isCustomColor({ color, palette });
+    const color = getColor(element);
+    return color !== null && isCustomColor({ color, palette });
   });
 
   const colorCountMap = new Map<string, number>();
   colors.forEach((element) => {
-    const color =
-      element[elementColorTypeMap[type] as "backgroundColor" | "strokeColor"];
+    const color = getColor(element);
+    if (color === null) {
+      return;
+    }
     if (colorCountMap.has(color)) {
       colorCountMap.set(color, colorCountMap.get(color)! + 1);
     } else {
@@ -100,4 +109,5 @@ export const activeColorPickerSectionAtom =
 export type ColorPickerType =
   | "canvasBackground"
   | "elementBackground"
-  | "elementStroke";
+  | "elementStroke"
+  | "elementOuterGlow";

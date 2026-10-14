@@ -582,8 +582,23 @@ const getMaxStrokeWidth = (
   return maxStrokeWidth;
 };
 
-// 计算实际使用的 padding，考虑描边宽度的影响
-// 仅当 exportPadding > 0 时才根据描边宽度扩展，以尊重 exportPadding=0 的显式选择
+// 获取元素集合中外发光的最大向外扩散距离
+// （软发光模糊半径 / 图片硬边膨胀半径 / 形状硬边描边的外扩部分均 ≤ glow.width）
+const getMaxOuterGlowExtent = (
+  elements: readonly NonDeletedExcalidrawElement[],
+): number => {
+  let maxExtent = 0;
+  elements.forEach((element) => {
+    const glow = element.outerGlow;
+    if (glow?.enabled) {
+      maxExtent = Math.max(maxExtent, glow.width);
+    }
+  });
+  return maxExtent;
+};
+
+// 计算实际使用的 padding，考虑描边宽度与外发光扩散距离的影响
+// 仅当 exportPadding > 0 时才扩展，以尊重 exportPadding=0 的显式选择
 const getEffectiveExportPadding = (
   elements: readonly NonDeletedExcalidrawElement[],
   exportPadding: number,
@@ -592,7 +607,8 @@ const getEffectiveExportPadding = (
     return exportPadding;
   }
   const maxStrokeWidth = getMaxStrokeWidth(elements);
-  return Math.max(exportPadding, maxStrokeWidth / 2);
+  const maxGlowExtent = getMaxOuterGlowExtent(elements);
+  return Math.max(exportPadding, maxStrokeWidth / 2, maxGlowExtent);
 };
 
 // calculate smallest area to fit the contents in
