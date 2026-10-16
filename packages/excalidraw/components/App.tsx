@@ -442,6 +442,7 @@ import {
   floodFillMask,
   applyMaskToImage,
   invertMask,
+  mergeMasks,
   traceMaskContours,
 } from "../mask-editor/magicWand";
 
@@ -705,6 +706,8 @@ class App extends React.Component<AppProps, AppState> {
   private magicWandDisplayMask: MagicWandMask | null = null;
   private magicWandDisplayContours: MagicWandContour[] | null = null;
   private magicWandLastClickPos: { x: number; y: number } | null = null;
+  /** 魔法抠图多选（Shift）点击位置列表，用于容差/连续性变化时重算选区并集 */
+  private magicWandSelectionClicks: { x: number; y: number }[] = [];
 
   private _initialized = false;
 
@@ -3691,6 +3694,7 @@ class App extends React.Component<AppProps, AppState> {
       this.magicWandDisplayMask = null;
       this.magicWandDisplayContours = null;
       this.magicWandLastClickPos = null;
+      this.magicWandSelectionClicks = [];
     }
 
     // 容差 / 连续 / 反选变化时实时重新计算选区
@@ -3702,15 +3706,24 @@ class App extends React.Component<AppProps, AppState> {
         prevState.magicWandContiguous !== this.state.magicWandContiguous)
     ) {
       const { x, y } = this.magicWandLastClickPos;
-      const mask = floodFillMask(
-        this.magicWandImageData,
-        x,
-        y,
-        this.state.magicWandThreshold,
-        this.state.magicWandContiguous,
-      );
 
-      this.magicWandCurrentMask = mask;
+      // 基于全部多选点击点重算选区并集
+      const clickPoints = this.magicWandSelectionClicks.length
+        ? this.magicWandSelectionClicks
+        : [{ x, y }];
+      const masks = clickPoints
+        .map((pos) =>
+          floodFillMask(
+            this.magicWandImageData!,
+            pos.x,
+            pos.y,
+            this.state.magicWandThreshold,
+            this.state.magicWandContiguous,
+          ),
+        )
+        .filter((m): m is MagicWandMask => m !== null);
+
+      this.magicWandCurrentMask = mergeMasks(...masks);
       this.updateMagicWandDisplayCache();
     } else if (
       this.state.magicWandElementId &&
@@ -7322,7 +7335,17 @@ class App extends React.Component<AppProps, AppState> {
       magicWandContiguous,
     );
 
-    this.magicWandCurrentMask = mask;
+    // Shift 按下时与已有选区合并（多选）；否则替换为新选区
+    if (event.shiftKey) {
+      this.magicWandSelectionClicks = [
+        ...this.magicWandSelectionClicks,
+        { x: pixelX, y: pixelY },
+      ];
+      this.magicWandCurrentMask = mergeMasks(this.magicWandCurrentMask, mask);
+    } else {
+      this.magicWandSelectionClicks = [{ x: pixelX, y: pixelY }];
+      this.magicWandCurrentMask = mask;
+    }
     this.updateMagicWandDisplayCache();
 
     this.scene.triggerUpdate();
@@ -7431,6 +7454,7 @@ class App extends React.Component<AppProps, AppState> {
     this.magicWandDisplayMask = null;
     this.magicWandDisplayContours = null;
     this.magicWandLastClickPos = null;
+    this.magicWandSelectionClicks = [];
   };
 
   /**

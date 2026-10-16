@@ -140,6 +140,40 @@ export function applyMaskToImage(
 }
 
 /**
+ * 合并多个掩码（按位或，选区并集）。
+ * 任一掩码为 null 时忽略该掩码；全部为空时返回 null。
+ */
+export function mergeMasks(
+  ...masks: (MagicWandMask | null)[]
+): MagicWandMask | null {
+  const valid = masks.filter((m): m is MagicWandMask => m !== null);
+  if (valid.length === 0) {
+    return null;
+  }
+  if (valid.length === 1) {
+    return valid[0];
+  }
+
+  const { width, height } = valid[0];
+  const data = new Uint8Array(width * height);
+
+  for (const mask of valid) {
+    for (let i = 0; i < data.length; i++) {
+      if (mask.data[i]) {
+        data[i] = 1;
+      }
+    }
+  }
+
+  const bounds = computeMaskBounds(data, width, height);
+  if (!bounds) {
+    return null;
+  }
+
+  return { data, width, height, bounds };
+}
+
+/**
  * 反转掩码（选区内外互换）。
  */
 export function invertMask(mask: MagicWandMask | null): MagicWandMask | null {
