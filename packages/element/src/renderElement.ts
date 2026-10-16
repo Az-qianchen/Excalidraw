@@ -313,20 +313,29 @@ const drawElementWithGlow = (
     drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
   } else {
     // 软发光（所有元素类型）与图片硬边外扩（膨胀近似）：
-    // 都基于渲染后的 alpha silhouette 合成
+    // 都基于渲染后的 alpha silhouette 合成。
+    //
+    // 注意：silhouette 必须是独立离屏画布，不能在共享目标画布上
+    // "画→快照→清空"。导出时多个元素共用同一目标画布，若先画到
+    // 目标画布再快照，快照会带上之前已渲染元素（含其光晕）的像素，
+    // 模糊叠回后光晕被逐层累加、变宽（外发光宽度累加 bug）。
     const silhouette = document.createElement("canvas");
     silhouette.width = context.canvas.width;
     silhouette.height = context.canvas.height;
     const sctx = silhouette.getContext("2d")!;
-    context.save();
-    drawElementOnCanvas(element, rc, context, renderConfig, elementsMap);
-    context.restore();
-    sctx.drawImage(context.canvas, 0, 0);
+    // 复制目标画布的当前变换（平移/旋转/缩放），保证主体绘制位置一致
+    sctx.setTransform(context.getTransform());
+    drawElementOnCanvas(
+      element,
+      rough.canvas(silhouette),
+      sctx,
+      renderConfig,
+      elementsMap,
+    );
 
-    // 清空主画布，垫入发光层（软发光或硬边膨胀），再盖回主体
+    // 在共享目标画布上垫入发光层（软发光或硬边膨胀），再盖回主体
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
     if (glow.hardEdge) {
       renderHardEdgeFromSilhouette(context, silhouette, glow, pixelRatio);
     } else {
