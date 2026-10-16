@@ -28,3 +28,5 @@ html
 meta*.json
 .claude
 2026*/
+.box-agent/
+.box-agent-scratch/

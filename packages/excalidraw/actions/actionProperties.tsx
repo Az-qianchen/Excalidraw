@@ -785,6 +785,16 @@ export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
   label: "labels.outerGlow",
   trackEvent: false,
   perform: (elements, appState, value) => {
+    // ColorPicker 会通过 updateData 同步 popover 开关状态。
+    // openPopup 属于 appState（UI 状态），不能并进元素的 outerGlow，
+    // 否则既污染发光配置，弹层又永远不会打开。
+    if (value && "openPopup" in value) {
+      return {
+        appState: { ...appState, openPopup: (value as any).openPopup },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      };
+    }
+
     return {
       elements: changeProperty(
         elements,
@@ -832,9 +842,7 @@ export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
 
     // 从 hex8 提取 alpha 百分比（0-100）
     const alphaHex = glow.color.slice(7, 9) || "ff";
-    const alphaPercent = Math.round(
-      (parseInt(alphaHex, 16) / 255) * 100,
-    );
+    const alphaPercent = Math.round((parseInt(alphaHex, 16) / 255) * 100);
 
     // hex → "#rrggbb"
     const hexColor = glow.color.slice(0, 7);
