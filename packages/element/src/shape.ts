@@ -52,7 +52,11 @@ import {
   isIframeLikeElement,
   isLinearElement,
 } from "./typeChecks";
-import { getCornerRadius, isPathALoop } from "./utils";
+import {
+  CIRCLE_ARC_CUBIC_KAPPA,
+  getCornerRadius,
+  isPathALoop,
+} from "./utils";
 import { headingForPointIsHorizontal } from "./heading";
 
 import { canChangeRoundness } from "./comparisons";
@@ -767,10 +771,20 @@ const generateRectanguloidShape = (
     const w = element.width;
     const h = element.height;
     const r = getCornerRadius(Math.min(w, h), element);
+    // Use cubic Bézier approximation of a circular arc (kappa ≈ 0.5519) so
+    // that a fully rounded rectangle (r = min(w, h) / 2) renders as a circle.
+    // A quadratic Bézier undershoots the arc and produces a "squircle".
+    const k = CIRCLE_ARC_CUBIC_KAPPA;
     return generator.path(
-      `M ${r} 0 L ${w - r} 0 Q ${w} 0, ${w} ${r} L ${w} ${h - r} Q ${w} ${h}, ${
-        w - r
-      } ${h} L ${r} ${h} Q 0 ${h}, 0 ${h - r} L 0 ${r} Q 0 0, ${r} 0`,
+      `M ${r} 0
+       L ${w - r} 0
+       C ${w - r + k * r} 0, ${w} ${r - k * r}, ${w} ${r}
+       L ${w} ${h - r}
+       C ${w} ${h - r + k * r}, ${w - r + k * r} ${h}, ${w - r} ${h}
+       L ${r} ${h}
+       C ${r - k * r} ${h}, ${0} ${h - r + k * r}, ${0} ${h - r}
+       L ${0} ${r}
+       C ${0} ${r - k * r}, ${r - k * r} 0, ${r} 0`,
       options,
     );
   }

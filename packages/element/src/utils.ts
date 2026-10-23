@@ -207,6 +207,12 @@ export function deconstructLinearOrFreeDrawElement(
  * @param offset Optional offset to expand the rectanguloid shape
  * @returns Tuple of **unrotated** line segments (0) and curves (1)
  */
+// Cubic Bézier approximation coefficient for a 90° circular arc.
+// Using this for corner arcs ensures the corner is a true circular arc,
+// so a rectangle with radius = min(w, h) / 2 renders as a perfect circle
+// (a quadratic Bézier undershoots the arc and yields a "squircle").
+export const CIRCLE_ARC_CUBIC_KAPPA = 0.5519150244935986;
+
 export function deconstructRectanguloidElement(
   element: ExcalidrawRectanguloidElement,
   offset: number = 0,
@@ -252,48 +258,48 @@ export function deconstructRectanguloidElement(
     curve(
       left[1],
       pointFrom<GlobalPoint>(
-        left[1][0] + (2 / 3) * (r[0][0] - left[1][0]),
-        left[1][1] + (2 / 3) * (r[0][1] - left[1][1]),
+        left[1][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][0] - left[1][0]),
+        left[1][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][1] - left[1][1]),
       ),
       pointFrom<GlobalPoint>(
-        top[0][0] + (2 / 3) * (r[0][0] - top[0][0]),
-        top[0][1] + (2 / 3) * (r[0][1] - top[0][1]),
+        top[0][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][0] - top[0][0]),
+        top[0][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][1] - top[0][1]),
       ),
       top[0],
     ), // TOP LEFT
     curve(
       top[1],
       pointFrom<GlobalPoint>(
-        top[1][0] + (2 / 3) * (r[1][0] - top[1][0]),
-        top[1][1] + (2 / 3) * (r[0][1] - top[1][1]),
+        top[1][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][0] - top[1][0]),
+        top[1][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][1] - top[1][1]),
       ),
       pointFrom<GlobalPoint>(
-        right[0][0] + (2 / 3) * (r[1][0] - right[0][0]),
-        right[0][1] + (2 / 3) * (r[0][1] - right[0][1]),
+        right[0][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][0] - right[0][0]),
+        right[0][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][1] - right[0][1]),
       ),
       right[0],
     ), // TOP RIGHT
     curve(
       right[1],
       pointFrom<GlobalPoint>(
-        right[1][0] + (2 / 3) * (r[1][0] - right[1][0]),
-        right[1][1] + (2 / 3) * (r[1][1] - right[1][1]),
+        right[1][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][0] - right[1][0]),
+        right[1][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][1] - right[1][1]),
       ),
       pointFrom<GlobalPoint>(
-        bottom[1][0] + (2 / 3) * (r[1][0] - bottom[1][0]),
-        bottom[1][1] + (2 / 3) * (r[1][1] - bottom[1][1]),
+        bottom[1][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][0] - bottom[1][0]),
+        bottom[1][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][1] - bottom[1][1]),
       ),
       bottom[1],
     ), // BOTTOM RIGHT
     curve(
       bottom[0],
       pointFrom<GlobalPoint>(
-        bottom[0][0] + (2 / 3) * (r[0][0] - bottom[0][0]),
-        bottom[0][1] + (2 / 3) * (r[1][1] - bottom[0][1]),
+        bottom[0][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][0] - bottom[0][0]),
+        bottom[0][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][1] - bottom[0][1]),
       ),
       pointFrom<GlobalPoint>(
-        left[0][0] + (2 / 3) * (r[0][0] - left[0][0]),
-        left[0][1] + (2 / 3) * (r[1][1] - left[0][1]),
+        left[0][0] + CIRCLE_ARC_CUBIC_KAPPA * (r[0][0] - left[0][0]),
+        left[0][1] + CIRCLE_ARC_CUBIC_KAPPA * (r[1][1] - left[0][1]),
       ),
       left[0],
     ), // BOTTOM LEFT
