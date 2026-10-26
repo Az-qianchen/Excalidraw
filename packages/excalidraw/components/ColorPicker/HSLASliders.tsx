@@ -10,6 +10,10 @@ import "./HSLASliders.scss";
 interface HSLASlidersProps {
   color: string | null;
   onChange: (color: string) => void;
+  /** 滑块拖动中的实时预览（不进撤销栈）；未提供时退回 onChange */
+  onPreview?: (color: string) => void;
+  /** 滑块拖动结束（松手 / 键盘抬起）时触发，携带松手时的最终颜色；用于提交撤销记录 */
+  onCommit?: (color: string) => void;
 }
 
 /** 色相滑块的彩虹渐变背景 */
@@ -28,6 +32,8 @@ export const HSLASliderRow = ({
   disabled,
   ariaLabel,
   onChange,
+  onPreview,
+  onCommit,
 }: {
   label: string;
   value: number;
@@ -39,6 +45,10 @@ export const HSLASliderRow = ({
   disabled?: boolean;
   ariaLabel?: string;
   onChange: (value: number) => void;
+  /** 拖动中的实时预览；未提供时退回 onChange */
+  onPreview?: (value: number) => void;
+  /** 拖动结束（pointerup / 方向键抬起）时触发，用于提交一次完整的撤销记录 */
+  onCommit?: (value: number) => void;
 }) => (
   <div className="hsla-slider-row">
     <label className="hsla-slider-label">{label}</label>
@@ -54,7 +64,23 @@ export const HSLASliderRow = ({
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          // 拖动 / 键盘调节的实时变化走预览通道（不进撤销栈），离散操作退回 onChange
+          if (onPreview) {
+            onPreview(v);
+          } else {
+            onChange(v);
+          }
+        }}
+        onPointerUp={(e) => onCommit?.(Number((e.target as HTMLInputElement).value))}
+        onKeyUp={(e) => {
+          // 方向键调节后松开时提交一次撤销记录
+          if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Home" || e.key === "End") {
+            onCommit?.(Number((e.target as HTMLInputElement).value));
+          }
+        }}
+        onBlur={(e) => onCommit?.(Number((e.target as HTMLInputElement).value))}
         className="hsla-slider-input"
         style={{ background: bg } as React.CSSProperties}
         disabled={disabled}
@@ -65,7 +91,12 @@ export const HSLASliderRow = ({
   </div>
 );
 
-export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
+export const HSLASliders = ({
+  color,
+  onChange,
+  onPreview,
+  onCommit,
+}: HSLASlidersProps) => {
   /** HSLA 四维本地状态，h: 0-360, s/l/a: 0-100 */
   const [hsla, setHSLA] = useState({ h: 0, s: 100, l: 50, a: 100 });
 
@@ -98,12 +129,20 @@ export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
   const buildHex = (h: number, s: number, l: number, a: number) =>
     hslaToHex(h, s, l, a / 100);
 
-  /** 统一处理四维变更：更新本地状态 + 通知父级 */
-  const handleChange = (partial: Partial<typeof hsla>) => {
+  /** 统一处理四维变更：更新本地状态 + 通知父级。isPreview 时只走预览通道 */
+  const handleChange = (
+    partial: Partial<typeof hsla>,
+    isPreview = false,
+  ) => {
     const next = { ...hsla, ...partial };
     isInternalRef.current = true;
     setHSLA(next);
-    onChange(buildHex(next.h, next.s, next.l, next.a));
+    const color = buildHex(next.h, next.s, next.l, next.a);
+    if (isPreview && onPreview) {
+      onPreview(color);
+    } else {
+      onChange(color);
+    }
   };
 
   // 滑块的动态渐变背景
@@ -176,6 +215,22 @@ export const HSLASliders = ({ color, onChange }: HSLASlidersProps) => {
             handleChange({
               [label.toLowerCase() as keyof typeof hsla]: v,
             } as Partial<typeof hsla>)
+          }
+          onPreview={
+            onPreview
+              ? (v) =>
+                  handleChange(
+                    {
+                      [label.toLowerCase() as keyof typeof hsla]: v,
+                    } as Partial<typeof hsla>,
+                    true,
+                  )
+              : undefined
+          }
+          onCommit={
+            onCommit
+              ? () => onCommit(buildHex(hsla.h, hsla.s, hsla.l, hsla.a))
+              : undefined
           }
         />
       ))}

@@ -49,9 +49,14 @@ import { getShortcutKey } from "../shortcut";
 
 import { register } from "./register";
 
+import { colorPickerCaptureUpdate, stripColorPickerUpdateFlags } from "./actionProperties";
+import type { ColorPickerUpdate } from "./actionProperties";
+
 import type { AppState, Offsets } from "../types";
 
-export const actionChangeViewBackgroundColor = register<Partial<AppState>>({
+export const actionChangeViewBackgroundColor = register<
+  Partial<AppState> & ColorPickerUpdate
+>({
   name: "changeViewBackgroundColor",
   label: "labels.canvasBackground",
   trackEvent: false,
@@ -63,9 +68,12 @@ export const actionChangeViewBackgroundColor = register<Partial<AppState>>({
   },
   perform: (_, appState, value) => {
     return {
-      appState: { ...appState, ...value },
+      appState: {
+        ...appState,
+        ...stripColorPickerUpdateFlags(value ?? {}),
+      },
       captureUpdate: !!value?.viewBackgroundColor
-        ? CaptureUpdateAction.IMMEDIATELY
+        ? colorPickerCaptureUpdate(value)
         : CaptureUpdateAction.EVENTUALLY,
     };
   },
@@ -79,6 +87,12 @@ export const actionChangeViewBackgroundColor = register<Partial<AppState>>({
         type="canvasBackground"
         color={appState.viewBackgroundColor}
         onChange={(color) => updateData({ viewBackgroundColor: color })}
+        onSliderPreview={(color) =>
+          updateData({ viewBackgroundColor: color, preview: true })
+        }
+        onSliderCommit={(color) =>
+          updateData({ viewBackgroundColor: color, commit: true })
+        }
         data-testid="canvas-background-picker"
         elements={elements}
         appState={appState}

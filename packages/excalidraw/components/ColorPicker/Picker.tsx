@@ -33,6 +33,10 @@ import type { ColorPickerType } from "./colorPickerUtils";
 interface PickerProps {
   color: string | null;
   onChange: (color: string) => void;
+  /** 滑块拖动中的实时预览（不进撤销栈） */
+  onSliderPreview?: (color: string) => void;
+  /** 滑块调节结束（松手）时触发，用于提交一次撤销记录 */
+  onSliderCommit?: (color: string) => void;
   type: ColorPickerType;
   elements: readonly ExcalidrawElement[];
   palette: ColorPaletteCustom;
@@ -49,6 +53,8 @@ export const Picker = React.forwardRef(
     {
       color,
       onChange,
+      onSliderPreview,
+      onSliderCommit,
       type,
       elements,
       palette,
@@ -207,7 +213,12 @@ export const Picker = React.forwardRef(
           {/* HSLA 颜色调整滑块：H(色相) / S(饱和度) / L(明度) / A(透明度) */}
           <div>
             <PickerHeading>{t("colorPicker.custom")}</PickerHeading>
-            <HSLASliders color={color} onChange={onChange} />
+            <HSLASliders
+              color={color}
+              onChange={onChange}
+              onPreview={onSliderPreview}
+              onCommit={onSliderCommit}
+            />
           </div>
           {children}
         </div>

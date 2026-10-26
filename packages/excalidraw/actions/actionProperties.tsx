@@ -327,8 +327,33 @@ const changeFontSize = (
 
 // -----------------------------------------------------------------------------
 
+// HSLA 滑块拖动中用 `preview: true`（EVENTUALLY，不进撤销栈），
+// 松手时 `onSliderCommit` 带 `commit: true` 提交一条完整撤销记录。
+// 色板 / 色卡点击等离散变更不带标记，保持原有 IMMEDIATELY 行为。
+type ColorPickerUpdate = {
+  preview?: boolean;
+  commit?: boolean;
+};
+
+export type { ColorPickerUpdate };
+
+export const colorPickerCaptureUpdate = (value?: ColorPickerUpdate) =>
+  value?.commit
+    ? CaptureUpdateAction.IMMEDIATELY
+    : value?.preview
+      ? CaptureUpdateAction.EVENTUALLY
+      : CaptureUpdateAction.IMMEDIATELY;
+
+/** 剥离 preview / commit 标记，避免污染 appState / 元素属性 */
+export const stripColorPickerUpdateFlags = <T extends ColorPickerUpdate>(
+  value: T | undefined,
+) => {
+  const { preview: _p, commit: _c, ...rest } = value ?? {};
+  return rest;
+};
+
 export const actionChangeStrokeColor = register<
-  Pick<AppState, "currentItemStrokeColor">
+  Pick<AppState, "currentItemStrokeColor"> & ColorPickerUpdate
 >({
   name: "changeStrokeColor",
   label: "labels.stroke",
@@ -346,9 +371,9 @@ export const actionChangeStrokeColor = register<
           return {
             appState: {
               ...appState,
-              ...value,
+              ...stripColorPickerUpdateFlags(value),
             },
-            captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+            captureUpdate: colorPickerCaptureUpdate(value),
           };
         }
       }
@@ -371,10 +396,10 @@ export const actionChangeStrokeColor = register<
       }),
       appState: {
         ...appState,
-        ...value,
+        ...stripColorPickerUpdateFlags(value),
       },
       captureUpdate: !!value?.currentItemStrokeColor
-        ? CaptureUpdateAction.IMMEDIATELY
+        ? colorPickerCaptureUpdate(value)
         : CaptureUpdateAction.EVENTUALLY,
     };
   },
@@ -400,6 +425,12 @@ export const actionChangeStrokeColor = register<
               !hasSelection ? appState.currentItemStrokeColor : null,
           )}
           onChange={(color) => updateData({ currentItemStrokeColor: color })}
+          onSliderPreview={(color) =>
+            updateData({ currentItemStrokeColor: color, preview: true })
+          }
+          onSliderCommit={(color) =>
+            updateData({ currentItemStrokeColor: color, commit: true })
+          }
           elements={elements}
           appState={appState}
           updateData={updateData}
@@ -410,7 +441,8 @@ export const actionChangeStrokeColor = register<
 });
 
 export const actionChangeBackgroundColor = register<
-  Pick<AppState, "currentItemBackgroundColor" | "viewBackgroundColor">
+  Pick<AppState, "currentItemBackgroundColor" | "viewBackgroundColor"> &
+    ColorPickerUpdate
 >({
   name: "changeBackgroundColor",
   label: "labels.changeBackground",
@@ -420,7 +452,7 @@ export const actionChangeBackgroundColor = register<
       return {
         appState: {
           ...appState,
-          ...value,
+          ...stripColorPickerUpdateFlags(value),
         },
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
       };
@@ -436,9 +468,9 @@ export const actionChangeBackgroundColor = register<
       elements: nextElements,
       appState: {
         ...appState,
-        ...value,
+        ...stripColorPickerUpdateFlags(value),
       },
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      captureUpdate: colorPickerCaptureUpdate(value),
     };
   },
   PanelComponent: ({ elements, appState, updateData, app, data }) => {
@@ -464,6 +496,15 @@ export const actionChangeBackgroundColor = register<
           )}
           onChange={(color) =>
             updateData({ currentItemBackgroundColor: color })
+          }
+          onSliderPreview={(color) =>
+            updateData({ currentItemBackgroundColor: color, preview: true })
+          }
+          onSliderCommit={(color) =>
+            updateData({
+              currentItemBackgroundColor: color,
+              commit: true,
+            })
           }
           elements={elements}
           appState={appState}
@@ -780,7 +821,9 @@ export const DEFAULT_OUTER_GLOW: Required<OuterGlow> = {
 
 // 外发光：颜色(含alpha) + 宽度 + 实度（衰减曲线陡峭度）+ 硬边外扩开关。
 // 硬边仅对形状/线条/文字（有原生 stroke 支持）可选；图片回退软发光。
-export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
+export const actionChangeOuterGlow = register<
+  Partial<OuterGlow> & ColorPickerUpdate
+>({
   name: "changeOuterGlow",
   label: "labels.outerGlow",
   trackEvent: false,
@@ -795,6 +838,8 @@ export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
       };
     }
 
+    const { preview: _preview, commit: _commit, ...glowValue } = value ?? {};
+
     return {
       elements: changeProperty(
         elements,
@@ -802,12 +847,12 @@ export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
         (el) => {
           const current = el.outerGlow ?? DEFAULT_OUTER_GLOW;
           return newElementWith(el, {
-            outerGlow: { ...current, ...value },
+            outerGlow: { ...current, ...glowValue },
           });
         },
         true,
       ),
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      captureUpdate: colorPickerCaptureUpdate(value),
     };
   },
   PanelComponent: ({ elements, appState, app, updateData }) => {
@@ -877,6 +922,12 @@ export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
                 // 保留原 alpha，拼回 hex8
                 updateData({ color: color + alphaHex });
               }}
+              onSliderPreview={(color) => {
+                updateData({ color: color + alphaHex, preview: true });
+              }}
+              onSliderCommit={(color) => {
+                updateData({ color: color + alphaHex, commit: true });
+              }}
               elements={elements}
               appState={appState}
               updateData={updateData}
@@ -941,11 +992,18 @@ export const actionChangeOuterGlow = register<Partial<OuterGlow>>({
 });
 
 // HSLA 图片颜色调节 (H/S/L/A 四维)
-export const actionChangeImageFilters = register<Partial<ImageHSLA>>({
+// `onCommit` 为 true 时表示一次调节交互结束（如滑块拖动松手），
+// 此时才用 IMMEDIATELY 提交一条完整撤销记录；
+// 拖动过程中的连续变化用 EVENTUALLY，不逐条进入撤销栈。
+export const actionChangeImageFilters = register<
+  Partial<ImageHSLA> & { onCommit?: boolean }
+>({
   name: "changeImageFilters",
   label: "labels.imageFilters",
   trackEvent: false,
   perform: (elements, appState, value) => {
+    const { onCommit, ...hslaValue } = value ?? {};
+
     return {
       elements: changeProperty(
         elements,
@@ -954,14 +1012,16 @@ export const actionChangeImageFilters = register<Partial<ImageHSLA>>({
           if (isImageElement(el)) {
             const current = el.imageHSLA ?? DEFAULT_IMAGE_HSLA;
             return newElementWith(el, {
-              imageHSLA: { ...current, ...value },
+              imageHSLA: { ...current, ...hslaValue },
             });
           }
           return el;
         },
         true,
       ),
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      captureUpdate: onCommit
+        ? CaptureUpdateAction.IMMEDIATELY
+        : CaptureUpdateAction.EVENTUALLY,
     };
   },
   PanelComponent: ({ elements, appState, app, updateData }) => {
@@ -1049,6 +1109,7 @@ export const actionChangeImageFilters = register<Partial<ImageHSLA>>({
               bg={bg}
               isAlpha={isAlpha}
               onChange={(v) => updateData({ [field]: v })}
+              onCommit={(v) => updateData({ [field]: v, onCommit: true })}
             />
           ))}
         </div>

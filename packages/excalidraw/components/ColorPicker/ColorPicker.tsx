@@ -46,6 +46,10 @@ interface ColorPickerProps {
    */
   color: string | null;
   onChange: (color: string) => void;
+  /** HSLA 滑块拖动中的实时预览（不进撤销栈） */
+  onSliderPreview?: (color: string) => void;
+  /** HSLA 滑块拖动结束时触发（携带最终颜色）；配合 action 的 commit 标记实现整段拖动只记一条撤销记录 */
+  onSliderCommit?: (color: string) => void;
   label: string;
   elements: readonly ExcalidrawElement[];
   appState: AppState;
@@ -58,6 +62,8 @@ const ColorPickerPopupContent = ({
   type,
   color,
   onChange,
+  onSliderPreview,
+  onSliderCommit,
   label,
   elements,
   palette = COLOR_PALETTE,
@@ -69,6 +75,8 @@ const ColorPickerPopupContent = ({
   | "type"
   | "color"
   | "onChange"
+  | "onSliderPreview"
+  | "onSliderCommit"
   | "label"
   | "elements"
   | "palette"
@@ -165,6 +173,8 @@ const ColorPickerPopupContent = ({
               restoreCaretPosition(savedSelection);
             }
           }}
+          onSliderPreview={onSliderPreview}
+          onSliderCommit={onSliderCommit}
           onEyeDropperToggle={(force) => {
             setEyeDropperState((state) => {
               if (force) {
@@ -283,6 +293,8 @@ export const ColorPicker = ({
   type,
   color,
   onChange,
+  onSliderPreview,
+  onSliderCommit,
   label,
   elements,
   palette = COLOR_PALETTE,
@@ -353,6 +365,8 @@ export const ColorPicker = ({
               type={type}
               color={color}
               onChange={onChange}
+              onSliderPreview={onSliderPreview}
+              onSliderCommit={onSliderCommit}
               label={label}
               elements={elements}
               palette={palette}
