@@ -13,6 +13,7 @@ import {
   DEFAULT_FONT_SIZE,
   FONT_FAMILY,
   ROUNDNESS,
+  STROKE_WIDTH_KEYS,
   STROKE_WIDTH,
   VERTICAL_ALIGN,
   KEYS,
@@ -20,9 +21,11 @@ import {
   arrayToMap,
   getFontFamilyString,
   getLineHeight,
+  getStrokeWidthByKey,
   reduceToCommonValue,
   invariant,
   FONT_SIZES,
+  type StrokeWidthKey,
 } from "@excalidraw/common";
 
 import { getNonDeletedElements } from "@excalidraw/element";
@@ -71,11 +74,13 @@ import type {
   ElementsMap,
   ExcalidrawBindableElement,
   ExcalidrawElement,
+  ExcalidrawFreeDrawElement,
   ExcalidrawLinearElement,
   ExcalidrawTextElement,
   FontFamilyValues,
   ImageHSLA,
   OuterGlow,
+  StrokeVariability,
   TextAlign,
   VerticalAlign,
 } from "@excalidraw/element/types";
@@ -86,6 +91,7 @@ import type { CaptureUpdateActionType } from "@excalidraw/element";
 
 import { trackEvent } from "../analytics";
 import { RadioSelection } from "../components/RadioSelection";
+import { ToolButton } from "../components/ToolButton";
 import { ColorPicker } from "../components/ColorPicker/ColorPicker";
 import { FontPicker } from "../components/FontPicker/FontPicker";
 import { IconPicker } from "../components/IconPicker";
@@ -140,6 +146,8 @@ import {
   ArrowheadCardinalityOneOrManyIcon,
   ArrowheadCardinalityZeroOrManyIcon,
   ArrowheadCardinalityZeroOrOneIcon,
+  strokeVariabilityConstantIcon,
+  strokeVariabilityVariableIcon,
 } from "../components/icons";
 
 import { Fonts } from "../fonts";
@@ -204,7 +212,11 @@ export const changeProperty = (
 export const getFormValue = function <T extends Primitive>(
   elements: readonly ExcalidrawElement[],
   app: AppClassProperties,
-  getAttribute: (element: ExcalidrawElement) => T,
+  /**
+   * input value (usually the element attribute value,
+   * but depends on what the action's PanelComponent input expects)
+   */
+  getValue: (element: ExcalidrawElement) => T,
   elementPredicate: true | ((element: ExcalidrawElement) => boolean),
   defaultValue: T | ((isSomeElementSelected: boolean) => T),
 ): T {
@@ -214,7 +226,7 @@ export const getFormValue = function <T extends Primitive>(
   let ret: T | null = null;
 
   if (editingTextElement) {
-    ret = getAttribute(editingTextElement);
+    ret = getValue(editingTextElement);
   }
 
   if (!ret) {
@@ -228,7 +240,7 @@ export const getFormValue = function <T extends Primitive>(
           : selectedElements.filter((el) => elementPredicate(el));
 
       ret =
-        reduceToCommonValue(targetElements, getAttribute) ??
+        reduceToCommonValue(targetElements, getValue) ??
         (typeof defaultValue === "function"
           ? defaultValue(true)
           : defaultValue);
@@ -604,13 +616,27 @@ export const actionChangeStrokeWidth = register<
   label: "labels.strokeWidth",
   trackEvent: false,
   perform: (elements, appState, value) => {
+    invariant(value, "actionChangeStrokeWidth: value must be defined");
+
+    // 数值自由调节：若数值命中某档 key（如 thin=1），按元素类型换算
+    // （freedraw 独立量表）；自定义数值（如 3）则直接应用。
+    // 同时把 key 写回 appState，兼容上游存储/恢复链路。
+    const strokeWidthKey = STROKE_WIDTH_KEYS.find(
+      (key) => getStrokeWidthByKey("rectangle", key) === value,
+    );
+
     return {
       elements: changeProperty(elements, appState, (el) =>
         newElementWith(el, {
-          strokeWidth: value,
+          strokeWidth: strokeWidthKey
+            ? getStrokeWidthByKey(el.type, strokeWidthKey)
+            : value,
         }),
       ),
-      appState: { ...appState, currentItemStrokeWidth: value },
+      appState: {
+        ...appState,
+        currentItemStrokeWidthKey: strokeWidthKey ?? appState.currentItemStrokeWidthKey,
+      },
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     };
   },
@@ -620,7 +646,13 @@ export const actionChangeStrokeWidth = register<
       app,
       (element) => element.strokeWidth,
       (element) => element.hasOwnProperty("strokeWidth"),
-      (hasSelection) => (hasSelection ? null : appState.currentItemStrokeWidth),
+      (hasSelection) =>
+        hasSelection
+          ? null
+          : getStrokeWidthByKey(
+              elements[0]?.type ?? "rectangle",
+              appState.currentItemStrokeWidthKey,
+            ),
     );
 
     return (
@@ -711,6 +743,87 @@ export const actionChangeSloppiness = register<ExcalidrawElement["roughness"]>({
       </div>
     </fieldset>
   ),
+});
+
+export const actionChangeFreedrawMode = register<StrokeVariability>({
+  name: "changeFreedrawMode",
+  label: "labels.pressure",
+  trackEvent: false,
+  perform: (elements, appState, value) => {
+    const variability = value || "constant";
+
+    return {
+      elements: changeProperty(elements, appState, (el) => {
+        if (el.type !== "freedraw") {
+          return el;
+        }
+        return newElementWith(el, {
+          strokeOptions: {
+            ...el.strokeOptions,
+            variability,
+          },
+        }) as ExcalidrawElement;
+      }),
+      appState: { ...appState, currentItemStrokeVariability: variability },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    };
+  },
+  PanelComponent: ({ elements, appState, updateData, app, data }) => {
+    const strokeVariability =
+      getFormValue(
+        elements,
+        app,
+        (element) =>
+          (element as ExcalidrawFreeDrawElement).strokeOptions?.variability,
+        (element) => element.type === "freedraw",
+        (hasSelection) =>
+          hasSelection ? null : appState.currentItemStrokeVariability,
+      ) ?? appState.currentItemStrokeVariability;
+
+    // in the compact UI the pressure setting is rendered as a single button
+    // that cycles between the two variability modes on click
+    if (data?.cycle) {
+      const isVariable = strokeVariability === "variable";
+      return (
+        <ToolButton
+          type="button"
+          icon={
+            isVariable
+              ? strokeVariabilityVariableIcon
+              : strokeVariabilityConstantIcon
+          }
+          title={t("labels.pressure")}
+          aria-label={t("labels.pressure")}
+          onClick={() => updateData(isVariable ? "constant" : "variable")}
+        />
+      );
+    }
+
+    return (
+      <fieldset>
+        <legend>{t("labels.pressure")}</legend>
+        <div className="buttonList">
+          <RadioSelection<StrokeVariability>
+            group="strokeOptions.variability"
+            options={[
+              {
+                value: "constant",
+                text: t("labels.pressure_constant"),
+                icon: strokeVariabilityConstantIcon,
+              },
+              {
+                value: "variable",
+                text: t("labels.pressure_variable"),
+                icon: strokeVariabilityVariableIcon,
+              },
+            ]}
+            value={strokeVariability}
+            onChange={(value) => updateData(value)}
+          />
+        </div>
+      </fieldset>
+    );
+  },
 });
 
 export const actionChangeStrokeStyle = register<

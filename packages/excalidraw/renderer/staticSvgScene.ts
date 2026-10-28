@@ -364,6 +364,14 @@ const renderElementToSvg = (
         );
         offsetX = offsetX || 0;
         offsetY = offsetY || 0;
+        // Pin the mask to user space; the default maskUnits="objectBoundingBox"
+        // collapses to zero area for axis-aligned arrows (zero-size bbox),
+        // hiding the whole line from SVG exports (#11439).
+        maskPath.setAttribute("maskUnits", "userSpaceOnUse");
+        maskPath.setAttribute("x", "0");
+        maskPath.setAttribute("y", "0");
+        maskPath.setAttribute("width", `${element.width + 100 + offsetX}`);
+        maskPath.setAttribute("height", `${element.height + 100 + offsetY}`);
         maskRectVisible.setAttribute("x", "0");
         maskRectVisible.setAttribute("y", "0");
         maskRectVisible.setAttribute("fill", "#fff");
@@ -472,9 +480,10 @@ const renderElementToSvg = (
           const path = svgRoot.ownerDocument.createElementNS(SVG_NS, "path");
           path.setAttribute(
             "fill",
-            renderConfig.theme === THEME.DARK
-              ? applyDarkModeFilter(element.strokeColor)
-              : element.strokeColor,
+            applyDarkModeFilter(
+              element.strokeColor,
+              renderConfig.theme === THEME.DARK,
+            ),
           );
           path.setAttribute("d", shape);
           wrapper.appendChild(path);
@@ -757,9 +766,10 @@ const renderElementToSvg = (
         rect.setAttribute("fill", "none");
         rect.setAttribute(
           "stroke",
-          renderConfig.theme === THEME.DARK
-            ? applyDarkModeFilter(FRAME_STYLE.strokeColor)
-            : FRAME_STYLE.strokeColor,
+          applyDarkModeFilter(
+            FRAME_STYLE.strokeColor,
+            renderConfig.theme === THEME.DARK,
+          ),
         );
         rect.setAttribute("stroke-width", FRAME_STYLE.strokeWidth.toString());
 
@@ -803,7 +813,6 @@ const renderElementToSvg = (
             : element.textAlign === "right" || direction === "rtl"
             ? "end"
             : "start";
-
         if (element.spans && element.spans.length > 0) {
           const spanContainer = getContainerElement(element, elementsMap);
           const spanMaxWidth = spanContainer
@@ -840,9 +849,10 @@ const renderElementToSvg = (
               const spanColor = span.color || element.strokeColor;
               tspan.setAttribute(
                 "fill",
-                renderConfig.theme === THEME.DARK
-                  ? applyDarkModeFilter(spanColor)
-                  : spanColor,
+                applyDarkModeFilter(
+                  spanColor,
+                  renderConfig.theme === THEME.DARK,
+                ),
               );
               textEl.appendChild(tspan);
             }
@@ -859,9 +869,10 @@ const renderElementToSvg = (
             text.setAttribute("font-size", `${element.fontSize}px`);
             text.setAttribute(
               "fill",
-              renderConfig.theme === THEME.DARK
-                ? applyDarkModeFilter(element.strokeColor)
-                : element.strokeColor,
+              applyDarkModeFilter(
+                element.strokeColor,
+                renderConfig.theme === THEME.DARK,
+              ),
             );
             text.setAttribute("text-anchor", textAnchor);
             text.setAttribute("style", "white-space: pre;");

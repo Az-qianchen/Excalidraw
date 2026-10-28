@@ -468,9 +468,7 @@ export const exportToSvg = async (
     rect.setAttribute("height", `${height}`);
     rect.setAttribute(
       "fill",
-      exportWithDarkMode
-        ? applyDarkModeFilter(viewBackgroundColor)
-        : viewBackgroundColor,
+      applyDarkModeFilter(viewBackgroundColor, exportWithDarkMode),
     );
     svgRoot.appendChild(rect);
   }

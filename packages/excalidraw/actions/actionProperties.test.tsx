@@ -1,8 +1,9 @@
-import { queryByTestId } from "@testing-library/react";
+import { fireEvent, queryByTestId } from "@testing-library/react";
 
 import {
   COLOR_PALETTE,
   DEFAULT_ELEMENT_BACKGROUND_PICKS,
+  FREEDRAW_STROKE_WIDTH,
   FONT_FAMILY,
   STROKE_WIDTH,
 } from "@excalidraw/common";
@@ -128,6 +129,64 @@ describe("element locking", () => {
       expect(thinStrokeWidthButton).toBeChecked();
     });
 
+    it("should highlight common stroke width key across freedraw and non-freedraw elements", () => {
+      const rect = API.createElement({
+        type: "rectangle",
+        strokeWidth: STROKE_WIDTH.medium,
+      });
+      const freedraw = API.createElement({
+        type: "freedraw",
+        strokeWidth: FREEDRAW_STROKE_WIDTH.medium,
+      });
+      API.setElements([rect, freedraw]);
+      API.setSelectedElements([rect, freedraw]);
+
+      // 数值面板：rect=2 与 freedraw=1 无共同数值，不高亮任何档位
+      expect(queryByTestId(document.body, `strokeWidth-thin`)).not.toBeChecked();
+      expect(queryByTestId(document.body, `strokeWidth-bold`)).not.toBeChecked();
+    });
+
+    it("should apply stroke width by element type", () => {
+      const rect = API.createElement({
+        type: "rectangle",
+        strokeWidth: STROKE_WIDTH.thin,
+      });
+      const freedraw = API.createElement({
+        type: "freedraw",
+        strokeWidth: FREEDRAW_STROKE_WIDTH.thin,
+      });
+      API.setElements([rect, freedraw]);
+      API.setSelectedElements([rect, freedraw]);
+
+      const boldStrokeWidthButton = queryByTestId(
+        document.body,
+        `strokeWidth-bold`,
+      );
+      expect(boldStrokeWidthButton).not.toBe(null);
+      fireEvent.click(boldStrokeWidthButton!);
+
+      const selectedElements = API.getSelectedElements();
+      const selectedRect = selectedElements.find(
+        (element) => element.type === "rectangle",
+      );
+      const selectedFreedraw = selectedElements.find(
+        (element) => element.type === "freedraw",
+      );
+
+      expect(selectedRect?.strokeWidth).toBe(STROKE_WIDTH.bold);
+      expect(selectedFreedraw?.strokeWidth).toBe(FREEDRAW_STROKE_WIDTH.bold);
+    });
+
+    it("should create new elements with stroke width by element type", () => {
+      API.setAppState({ currentItemStrokeWidthKey: "bold" });
+
+      const rect = API.createElement({ type: "rectangle" });
+      const freedraw = API.createElement({ type: "freedraw" });
+
+      expect(rect.strokeWidth).toBe(STROKE_WIDTH.bold);
+      expect(freedraw.strokeWidth).toBe(FREEDRAW_STROKE_WIDTH.bold);
+    });
+
     it("should not highlight any stroke width button if no common style", () => {
       const rect1 = API.createElement({
         type: "rectangle",
@@ -135,7 +194,7 @@ describe("element locking", () => {
       });
       const rect2 = API.createElement({
         type: "rectangle",
-        strokeWidth: STROKE_WIDTH.bold,
+        strokeWidth: STROKE_WIDTH.medium,
       });
       API.setElements([rect1, rect2]);
       API.setSelectedElements([rect1, rect2]);
@@ -155,7 +214,7 @@ describe("element locking", () => {
     it("should show properties of different element types when selected", () => {
       const rect = API.createElement({
         type: "rectangle",
-        strokeWidth: STROKE_WIDTH.bold,
+        strokeWidth: STROKE_WIDTH.medium,
       });
       const text = API.createElement({
         type: "text",
@@ -164,7 +223,9 @@ describe("element locking", () => {
       API.setElements([rect, text]);
       API.setSelectedElements([rect, text]);
 
-      expect(queryByTestId(document.body, `strokeWidth-bold`)).toBeChecked();
+      // 数值面板：strokeWidth=2 不对应任何档位按钮，均不高亮
+      expect(queryByTestId(document.body, `strokeWidth-thin`)).not.toBeChecked();
+      expect(queryByTestId(document.body, `strokeWidth-bold`)).not.toBeChecked();
       expect(queryByTestId(document.body, `font-family-code`)).toHaveClass(
         "active",
       );
