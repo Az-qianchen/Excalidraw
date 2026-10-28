@@ -4,7 +4,7 @@ import { CaptureUpdateAction } from "@excalidraw/element";
 
 import type { ExcalidrawImageElement } from "@excalidraw/element/types";
 
-import { ToolButton } from "../components/ToolButton";
+import { IconButton } from "../components/IconButton";
 import { maskIcon } from "../components/icons";
 import { t } from "../i18n";
 
@@ -51,7 +51,7 @@ export const actionToggleMaskEditor = register({
     const label = t("helpDialog.maskStart");
 
     return (
-      <ToolButton
+      <IconButton
         type="button"
         icon={maskIcon}
         title={label}

@@ -6,7 +6,7 @@ import { getNormalizedGridSize, getNormalizedGridStep } from "../scene";
 import { t } from "../i18n";
 
 import { gridIcon } from "./icons";
-import { ToolButton } from "./ToolButton";
+import { IconButton } from "./IconButton";
 import { PropertiesPopover } from "./PropertiesPopover";
 import { useExcalidrawContainer } from "./App";
 import { StrokeWidthInput } from "./StrokeWidthInput";
@@ -30,7 +30,7 @@ export const GridSettings = ({
   return (
     <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
       <Popover.Trigger asChild>
-        <ToolButton
+        <IconButton
           type="button"
           icon={gridIcon}
           title={t("labels.toggleGrid")}

@@ -24,6 +24,10 @@ import {
   invariant,
   applyDarkModeFilter,
   isSafari,
+  STICKY_NOTE_EDGE_SHADOW_OPACITY,
+  STICKY_NOTE_EDGE_SHADOW_WIDTH,
+  STICKY_NOTE_FOOTER,
+  STICKY_NOTE_SHADOW_OPACITY,
 } from "@excalidraw/common";
 
 import type {
@@ -74,6 +78,12 @@ import {
   getDashArrayDotted,
 } from "./shape";
 
+import {
+  getStickyNoteFooter,
+  getStickyNotePathCommands,
+  type StickyNotePathCommand,
+} from "./stickyNote";
+
 import { DEFAULT_IMAGE_HSLA } from "./types";
 import { splitSpansIntoLines } from "./textElement";
 import { renderOuterGlow, renderHardEdgeFromSilhouette } from "./outerGlow";
@@ -81,6 +91,7 @@ import { renderOuterGlow, renderHardEdgeFromSilhouette } from "./outerGlow";
 import type {
   ExcalidrawElement,
   ExcalidrawTextElement,
+  NonDeleted,
   NonDeletedExcalidrawElement,
   ExcalidrawFreeDrawElement,
   ExcalidrawImageElement,
@@ -482,7 +493,6 @@ const generateElementCanvas = (
         scale,
     );
   }
-
   return {
     element,
     canvas,
@@ -491,10 +501,9 @@ const generateElementCanvas = (
     zoomValue: zoom.value,
     canvasOffsetX,
     canvasOffsetY,
-    boundTextElementVersion:
-      getBoundTextElement(element, elementsMap)?.version || null,
     containingFrameOpacity:
       getContainingFrame(element, elementsMap)?.opacity || 100,
+    boundTextElementVersion: boundTextElement?.version || null,
     outerGlowSignature: outerGlow,
     boundTextCanvas,
     angle: element.angle,
@@ -553,6 +562,50 @@ const drawImagePlaceholder = (
  * 读取它决定 strokeText 还是 fillText（仅 generateElementCanvas 使用） */
 let drawTextOutlineOnly = false;
 
+const drawStickyNotePath = (
+  context: CanvasRenderingContext2D,
+  commands: StickyNotePathCommand[],
+) => {
+  context.beginPath();
+  for (const command of commands) {
+    if (command.type === "move") {
+      context.moveTo(command.point.x, command.point.y);
+    } else if (command.type === "line") {
+      context.lineTo(command.point.x, command.point.y);
+    } else {
+      context.quadraticCurveTo(
+        command.control.x,
+        command.control.y,
+        command.point.x,
+        command.point.y,
+      );
+    }
+  }
+  context.closePath();
+};
+
+const fillStickyNoteShape = (
+  context: CanvasRenderingContext2D,
+  commands: StickyNotePathCommand[],
+) => {
+  drawStickyNotePath(context, commands);
+  context.fill();
+};
+
+const strokeStickyNoteEdge = (
+  context: CanvasRenderingContext2D,
+  commands: StickyNotePathCommand[],
+) => {
+  context.save();
+  drawStickyNotePath(context, commands);
+  context.clip();
+  context.lineWidth = STICKY_NOTE_EDGE_SHADOW_WIDTH * 2;
+  context.strokeStyle = `rgba(0, 0, 0, ${STICKY_NOTE_EDGE_SHADOW_OPACITY})`;
+  drawStickyNotePath(context, commands);
+  context.stroke();
+  context.restore();
+};
+
 const drawElementOnCanvas = (
   element: NonDeletedExcalidrawElement,
   rc: RoughCanvas,
@@ -561,6 +614,41 @@ const drawElementOnCanvas = (
   elementsMap: ElementsMap,
 ) => {
   switch (element.type) {
+    case "stickynote": {
+      context.save();
+      context.fillStyle = `rgba(0, 0, 0, ${STICKY_NOTE_SHADOW_OPACITY})`;
+      fillStickyNoteShape(
+        context,
+        getStickyNotePathCommands(element, { shadow: true }),
+      );
+
+      const commands = getStickyNotePathCommands(element);
+      context.fillStyle = applyDarkModeFilter(
+        element.backgroundColor,
+        renderConfig.theme === THEME.DARK,
+      );
+      fillStickyNoteShape(context, commands);
+      strokeStickyNoteEdge(context, commands);
+
+      // the label is absolute, so this cached canvas only goes stale at a
+      // year boundary — and is regenerated on the next zoom, theme or
+      // element change anyway
+      const footer = getStickyNoteFooter(element);
+      if (footer) {
+        context.font = `${STICKY_NOTE_FOOTER.fontSize}px ${STICKY_NOTE_FOOTER.fontFamily}`;
+        context.textAlign = "right";
+        context.textBaseline = "alphabetic";
+        context.fillStyle = applyDarkModeFilter(
+          element.strokeColor,
+          renderConfig.theme === THEME.DARK,
+        );
+        context.globalAlpha *= STICKY_NOTE_FOOTER.opacity;
+        context.fillText(footer.text, footer.x, footer.y);
+      }
+
+      context.restore();
+      break;
+    }
     case "rectangle":
     case "iframe":
     case "embeddable":
@@ -728,7 +816,13 @@ const drawElementOnCanvas = (
         context.save();
         context.lineJoin = "round";
         context.lineCap = "round";
-        rc.draw(ShapeCache.generateElementShape(element, renderConfig));
+        const imageShape = ShapeCache.generateElementShape(
+          element,
+          renderConfig,
+        );
+        if (imageShape) {
+          rc.draw(imageShape);
+        }
         context.restore();
       }
 
@@ -872,11 +966,10 @@ const generateElementWithCanvas = (
     prevElementWithCanvas &&
     prevElementWithCanvas.zoomValue !== zoom.value &&
     !appState?.shouldCacheIgnoreZoom;
-  const boundTextElement = getBoundTextElement(element, elementsMap);
-  const boundTextElementVersion = boundTextElement?.version || null;
   const imageCrop = isImageElement(element) ? element.crop : null;
   const imageHSLA = isImageElement(element) ? element.imageHSLA ?? null : null;
 
+  const boundTextElement = getBoundTextElement(element, elementsMap);
   const containingFrameOpacity =
     getContainingFrame(element, elementsMap)?.opacity || 100;
   const outerGlow = element.outerGlow ? JSON.stringify(element.outerGlow) : null;
@@ -885,7 +978,6 @@ const generateElementWithCanvas = (
     !prevElementWithCanvas ||
     shouldRegenerateBecauseZoom ||
     prevElementWithCanvas.theme !== appState.theme ||
-    prevElementWithCanvas.boundTextElementVersion !== boundTextElementVersion ||
     prevElementWithCanvas.imageCrop !== imageCrop ||
     prevElementWithCanvas.imageHSLA !== imageHSLA ||
     prevElementWithCanvas.containingFrameOpacity !== containingFrameOpacity ||
@@ -917,6 +1009,38 @@ const generateElementWithCanvas = (
   return prevElementWithCanvas;
 };
 
+/**
+ * Whether an element's cached bitmap may be laid on the device-pixel grid:
+ * unrotated or at a right angle, and not during a zoom gesture. The cached
+ * path disables smoothing for exactly these — a nearest-neighbor 1:1 blit is
+ * a pixel-exact copy, and rounding its origin keeps it off the half-pixel
+ * boundary where it tears — and every eligible blit is snapped. It is
+ * eligibility, not a guarantee of a 1:1 copy: freedraw is blitted with
+ * smoothing on, and a size-capped cache is rescaled; snapping is harmless
+ * for both.
+ *
+ * Not during a zoom gesture: the bitmaps stay at the old scale and are
+ * resampled, and blurry shapes look better on low resolution (while still
+ * zooming in) than sharp ones; snapping would only make elements twitch.
+ * Right angles qualify because smoothing can be off there without aliasing
+ * (for other angles it is terrible on Chromium); the right-angle test
+ * tolerates float arithmetic.
+ */
+const canSnapElement = (
+  element: ExcalidrawElement,
+  appState: StaticCanvasAppState | InteractiveCanvasAppState,
+) =>
+  !appState?.shouldCacheIgnoreZoom &&
+  (!element.angle || isRightAngleRads(element.angle));
+
+/**
+ * Breaks a `Math.round` tie at exactly half a device pixel the same way
+ * every frame. A label's offset from its container lands on one routinely
+ * (an odd scene offset at 150%), and the float noise of a fractional drag
+ * would otherwise flip it between the two neighbors.
+ */
+const SNAP_TIE_BIAS = 1e-6;
+
 const drawElementFromCanvas = (
   elementWithCanvas: ExcalidrawElementWithCanvas,
   context: CanvasRenderingContext2D,
@@ -925,83 +1049,157 @@ const drawElementFromCanvas = (
   allElementsMap: NonDeletedSceneElementsMap,
 ) => {
   const element = elementWithCanvas.element;
+  // the ratio the cached bitmap was generated with (`generateElementCanvas`);
+  // the blit's size math needs the same one, so it is not the owner window's
+  const devicePixelRatio = window.devicePixelRatio;
   const padding = getCanvasPadding(element);
-  const zoom = elementWithCanvas.scale;
   const [x1, y1, x2, y2] = getElementAbsoluteCoords(element, allElementsMap);
-  const cx = ((x1 + x2) / 2 + appState.scrollX) * window.devicePixelRatio;
-  const cy = ((y1 + y2) / 2 + appState.scrollY) * window.devicePixelRatio;
+  const cx = ((x1 + x2) / 2 + appState.scrollX) * devicePixelRatio;
+  const cy = ((y1 + y2) / 2 + appState.scrollY) * devicePixelRatio;
 
   context.save();
-  context.scale(1 / window.devicePixelRatio, 1 / window.devicePixelRatio);
+  context.scale(1 / devicePixelRatio, 1 / devicePixelRatio);
 
   const boundTextElement = getBoundTextElement(element, allElementsMap);
 
   if (isArrowElement(element) && boundTextElement) {
-    const offsetX =
-      (elementWithCanvas.boundTextCanvas.width -
-        elementWithCanvas.canvas!.width) /
-      2;
-    const offsetY =
-      (elementWithCanvas.boundTextCanvas.height -
-        elementWithCanvas.canvas!.height) /
-      2;
-    context.translate(cx, cy);
-    context.drawImage(
-      elementWithCanvas.boundTextCanvas,
-      (-(x2 - x1) / 2) * window.devicePixelRatio - offsetX / zoom - padding,
-      (-(y2 - y1) / 2) * window.devicePixelRatio - offsetY / zoom - padding,
-      elementWithCanvas.boundTextCanvas.width / zoom,
-      elementWithCanvas.boundTextCanvas.height / zoom,
+    // punch the label "hole" by clipping the arrow's blit out of the label
+    // rect (even-odd) instead of baking a rotated arrow copy with a cleared
+    // hole into a separate (`maxDim`-squared!) canvas. The hole stays
+    // axis-aligned in scene space while the blit below rotates.
+    const [, , , , boundTextCx, boundTextCy] = getElementAbsoluteCoords(
+      boundTextElement,
+      allElementsMap,
     );
-  } else {
-    // we translate context to element center so that rotation and scale
-    // originates from the element center
-    context.translate(cx, cy);
-
-    context.rotate(element.angle);
-
-    if (
-      "scale" in elementWithCanvas.element &&
-      !isPendingImageElement(element, renderConfig)
-    ) {
-      context.scale(
-        elementWithCanvas.element.scale[0],
-        elementWithCanvas.element.scale[1],
-      );
-    }
-
-    // revert afterwards we don't have account for it during drawing
-    context.translate(-cx, -cy);
-
-    context.drawImage(
-      elementWithCanvas.canvas!,
-      (x1 + appState.scrollX) * window.devicePixelRatio -
-        (padding * elementWithCanvas.scale) / elementWithCanvas.scale,
-      (y1 + appState.scrollY) * window.devicePixelRatio -
-        (padding * elementWithCanvas.scale) / elementWithCanvas.scale,
-      elementWithCanvas.canvas!.width / elementWithCanvas.scale,
-      elementWithCanvas.canvas!.height / elementWithCanvas.scale,
+    // generously covers the arrow's blit at any rotation
+    const outerHalf =
+      Math.max(distance(x1, x2), distance(y1, y2)) * devicePixelRatio +
+      padding * 10;
+    context.beginPath();
+    context.rect(cx - outerHalf, cy - outerHalf, outerHalf * 2, outerHalf * 2);
+    context.rect(
+      (boundTextCx -
+        boundTextElement.width / 2 -
+        BOUND_TEXT_PADDING +
+        appState.scrollX) *
+        devicePixelRatio,
+      (boundTextCy -
+        boundTextElement.height / 2 -
+        BOUND_TEXT_PADDING +
+        appState.scrollY) *
+        devicePixelRatio,
+      (boundTextElement.width + BOUND_TEXT_PADDING * 2) * devicePixelRatio,
+      (boundTextElement.height + BOUND_TEXT_PADDING * 2) * devicePixelRatio,
     );
+    context.clip("evenodd");
+  }
 
-    if (
-      import.meta.env.VITE_APP_DEBUG_ENABLE_TEXT_CONTAINER_BOUNDING_BOX ===
-        "true" &&
-      hasBoundTextElement(element)
-    ) {
-      const textElement = getBoundTextElement(
-        element,
-        allElementsMap,
-      ) as ExcalidrawTextElementWithContainer;
-      const coords = getContainerCoords(element);
-      context.strokeStyle = "#c92a2a";
-      context.lineWidth = 3;
-      context.strokeRect(
-        (coords.x + appState.scrollX) * window.devicePixelRatio,
-        (coords.y + appState.scrollY) * window.devicePixelRatio,
-        getBoundTextMaxWidth(element, textElement) * window.devicePixelRatio,
-        getBoundTextMaxHeight(element, textElement) * window.devicePixelRatio,
-      );
-    }
+  // we translate context to element center so that rotation and scale
+  // originates from the element center
+  context.translate(cx, cy);
+
+  context.rotate(element.angle);
+
+  if (
+    "scale" in elementWithCanvas.element &&
+    !isPendingImageElement(element, renderConfig)
+  ) {
+    context.scale(
+      elementWithCanvas.element.scale[0],
+      elementWithCanvas.element.scale[1],
+    );
+  }
+
+  // revert afterwards we don't have account for it during drawing
+  context.translate(-cx, -cy);
+
+  // the blit origin, in the space the context is in here (scaled by
+  // canvas scale × zoom ÷ devicePixelRatio)
+  let drawX = (x1 + appState.scrollX) * devicePixelRatio - padding;
+  let drawY = (y1 + appState.scrollY) * devicePixelRatio - padding;
+
+  const transform = context.getTransform();
+
+  if (canSnapElement(element, appState)) {
+    // blit the cached bitmap on whole device pixels. Nearest-neighbor at a
+    // fractional offset is a pixel-exact copy shifted to the nearest pixel
+    // — except at an exact half pixel, where a GPU-accelerated canvas
+    // decides the rounding per scanline by float precision and a few rows
+    // sample the neighboring row: doubled or broken strokes, varying with
+    // scroll and position. A centered label lands on a half pixel
+    // routinely.
+    //
+    // Done by moving the transform's origin onto the rounded device
+    // position of the blit and drawing at (0, 0): the rotation, mirroring
+    // and scale stay in `a`–`d` (a right angle keeps its scale in `b`/`c`),
+    // and the origin is an exact integer even in the canvas's float32
+    // matrix. Rounding `drawX` itself only lands on device pixels at 100%
+    // zoom.
+    const { a, b, c, d, e, f } = transform;
+    const container = isTextElement(element)
+      ? getContainerElement(element, allElementsMap)
+      : null;
+    // A bound label shares its unrotated container's anchor. Other bitmaps
+    // anchor to themselves, with a zero relative offset.
+    const anchor = container && !container.angle ? container : element;
+    const anchorCoords =
+      anchor === element
+        ? null
+        : getElementAbsoluteCoords(anchor, allElementsMap);
+    const anchorSceneX = anchorCoords?.[0] ?? x1;
+    const anchorSceneY = anchorCoords?.[1] ?? y1;
+    const anchorPadding =
+      anchor === element ? padding : getCanvasPadding(anchor);
+    const anchorX =
+      (anchorSceneX + appState.scrollX) * devicePixelRatio - anchorPadding;
+    const anchorY =
+      (anchorSceneY + appState.scrollY) * devicePixelRatio - anchorPadding;
+
+    // Form the relative vector before introducing the scroll translation.
+    const dx = (x1 - anchorSceneX) * devicePixelRatio + anchorPadding - padding;
+    const dy = (y1 - anchorSceneY) * devicePixelRatio + anchorPadding - padding;
+    context.setTransform(
+      a,
+      b,
+      c,
+      d,
+      Math.round(a * anchorX + c * anchorY + e) +
+        Math.round(a * dx + c * dy + SNAP_TIE_BIAS),
+      Math.round(b * anchorX + d * anchorY + f) +
+        Math.round(b * dx + d * dy + SNAP_TIE_BIAS),
+    );
+    drawX = 0;
+    drawY = 0;
+  }
+
+  context.drawImage(
+    elementWithCanvas.canvas!,
+    drawX,
+    drawY,
+    elementWithCanvas.canvas!.width / elementWithCanvas.scale,
+    elementWithCanvas.canvas!.height / elementWithCanvas.scale,
+  );
+
+  context.setTransform(transform);
+
+  if (
+    import.meta.env.VITE_APP_DEBUG_ENABLE_TEXT_CONTAINER_BOUNDING_BOX ===
+      "true" &&
+    hasBoundTextElement(element)
+  ) {
+    const textElement = getBoundTextElement(
+      element,
+      allElementsMap,
+    ) as ExcalidrawTextElementWithContainer;
+    const coords = getContainerCoords(element);
+    context.strokeStyle = "#c92a2a";
+    context.lineWidth = 3;
+    context.strokeRect(
+      (coords.x + appState.scrollX) * devicePixelRatio,
+      (coords.y + appState.scrollY) * devicePixelRatio,
+      getBoundTextMaxWidth(element, textElement) * devicePixelRatio,
+      getBoundTextMaxHeight(element, textElement) * devicePixelRatio,
+    );
   }
   context.restore();
 
@@ -1016,7 +1214,10 @@ export const renderSelectionElement = (
 ) => {
   context.save();
   context.translate(element.x + appState.scrollX, element.y + appState.scrollY);
-  context.fillStyle = "rgba(0, 0, 200, 0.04)";
+  context.fillStyle = applyDarkModeFilter(
+    "rgba(0, 0, 200, 0.04)",
+    appState.theme === THEME.DARK,
+  );
 
   // render from 0.5px offset  to get 1px wide line
   // https://stackoverflow.com/questions/7530593/html5-canvas-and-line-width/7531540#7531540
@@ -1155,6 +1356,7 @@ export const renderElement = (
       break;
     }
     case "rectangle":
+    case "stickynote":
     case "diamond":
     case "ellipse":
     case "line":
@@ -1190,8 +1392,11 @@ export const renderElement = (
         const boundTextElement = getBoundTextElement(element, elementsMap);
 
         if (isArrowElement(element) && boundTextElement) {
-          // Draw arrow directly as vector and clear label hole separately.
-          // This avoids temp-canvas bitmap blit which introduces resampling blur.
+          // Draw arrow directly as vector (no temp-canvas bitmap blit which
+          // introduces resampling blur). The label "hole" is cut by clipping
+          // the arrow's own strokes out of the label rect (even-odd clip)
+          // so that elements rendered beneath the arrow keep showing through
+          // the gap.
           shiftX = element.width / 2 - (element.x - x1);
           shiftY = element.height / 2 - (element.y - y1);
 
@@ -1236,21 +1441,27 @@ export const renderElement = (
           const holeWidth = boundTextElement.width + BOUND_TEXT_PADDING * 2;
           const holeHeight = boundTextElement.height + BOUND_TEXT_PADDING * 2;
 
-          const isTransparentHole =
-            "viewBackgroundColor" in appState &&
-            (appState.viewBackgroundColor === "transparent" ||
-              !appState.viewBackgroundColor);
-          if (!isTransparentHole) {
-            context.save();
-            context.fillStyle = applyDarkModeFilter(
-              renderConfig.canvasBackgroundColor,
-              renderConfig.theme === THEME.DARK,
-            );
-            context.fillRect(holeX, holeY, holeWidth, holeHeight);
-            context.restore();
-          } else {
-            context.clearRect(holeX, holeY, holeWidth, holeHeight);
-          }
+          // generously covers the arrow's painted extent at any rotation
+          // (the hole rect stays axis-aligned in scene space)
+          const outerHalf =
+            Math.max(distance(x1, x2), distance(y1, y2)) +
+            getCanvasPadding(element) * 10;
+
+          context.save();
+          context.beginPath();
+          context.rect(-outerHalf, -outerHalf, outerHalf * 2, outerHalf * 2);
+          context.rect(holeX, holeY, holeWidth, holeHeight);
+          context.clip("evenodd");
+          context.rotate(element.angle);
+          context.translate(-shiftX, -shiftY);
+          drawElementOnCanvas(
+            element,
+            rc,
+            context,
+            renderConfig,
+            allElementsMap,
+          );
+          context.restore();
         } else {
           context.rotate(element.angle);
 
@@ -1300,17 +1511,9 @@ export const renderElement = (
 
         const currentImageSmoothingStatus = context.imageSmoothingEnabled;
 
-        if (
-          // do not disable smoothing during zoom as blurry shapes look better
-          // on low resolution (while still zooming in) than sharp ones
-          !appState?.shouldCacheIgnoreZoom &&
-          // angle is 0 -> always disable smoothing
-          (!element.angle ||
-            // or check if angle is a right angle in which case we can still
-            // disable smoothing without adversely affecting the result
-            // We need less-than comparison because of FP artihmetic
-            isRightAngleRads(element.angle))
-        ) {
+        // see `canSnapElement` for why not during zoom gestures or at
+        // other angles
+        if (canSnapElement(element, appState)) {
           // Disabling smoothing makes output much sharper, especially for
           // text. Unless for non-right angles, where the aliasing is really
           // terrible on Chromium.
@@ -1330,7 +1533,10 @@ export const renderElement = (
           context.globalAlpha = 0.1;
 
           const uncroppedElementCanvas = generateElementCanvas(
-            getUncroppedImageElement(elementWithCanvas.element, elementsMap),
+            getUncroppedImageElement(
+              elementWithCanvas.element,
+              elementsMap,
+            ) as NonDeleted<ExcalidrawImageElement>,
             allElementsMap,
             appState.zoom,
             renderConfig,

@@ -10,7 +10,7 @@ import {
   isShallowEqual,
 } from "@excalidraw/common";
 
-import { mutateElement } from "@excalidraw/element";
+import { getColorUpdate, mutateElement } from "@excalidraw/element";
 
 import { showSelectedShapeActions } from "@excalidraw/element";
 
@@ -25,15 +25,15 @@ import { UIAppStateContext } from "../context/ui-appState";
 import { useAtom, useAtomValue } from "../editor-jotai";
 
 import { t } from "../i18n";
-import { getScrollToContentState } from "../scene";
-
+import { getScrollToContentState, getSelectedElements } from "../scene";
 import {
-  SelectedShapeActions,
-  ShapesSwitcher,
-  CompactShapeActions,
-} from "./Actions";
+  getColorTargetAppStateUpdates,
+  resolveColorTarget,
+  type ColorDefaultKey,
+} from "../actions/colorTargets";
+
+import { SelectedShapeActions, CompactShapeActions } from "./Actions";
 import { LoadingMessage } from "./LoadingMessage";
-import { LockButton } from "./LockButton";
 import { MobileMenu } from "./MobileMenu";
 import { PasteChartDialog } from "./PasteChartDialog";
 import { SaveStatus } from "./SaveStatus";
@@ -46,7 +46,7 @@ import Footer from "./footer/Footer";
 import { isSidebarDockedAtom } from "./Sidebar/Sidebar";
 import MainMenu from "./main-menu/MainMenu";
 import { ActiveConfirmDialog } from "./ActiveConfirmDialog";
-import { useEditorInterface, useStylesPanelMode } from "./App";
+import { useAppProps, useEditorInterface, useStylesPanelMode } from "./App";
 import { OverwriteConfirmDialog } from "./OverwriteConfirm/OverwriteConfirm";
 import { sidebarRightIcon } from "./icons";
 import { DefaultSidebar } from "./DefaultSidebar";
@@ -57,12 +57,16 @@ import { ErrorDialog } from "./ErrorDialog";
 import { EyeDropper, activeEyeDropperAtom } from "./EyeDropper";
 import { FixedSideContainer } from "./FixedSideContainer";
 import { HelpDialog } from "./HelpDialog";
-import { HintViewer } from "./HintViewer";
 import { ImageExportDialog } from "./ImageExportDialog";
 import { Island } from "./Island";
 import { JSONExportDialog } from "./JSONExportDialog";
 import { LaserPointerButton } from "./LaserPointerButton";
 import { Toast } from "./Toast";
+import { Toolbar } from "./Toolbar";
+import {
+  ViewportStatusBadge,
+  ViewportStatusBorder,
+} from "./ViewportStatusFrame/ViewportStatusFrame";
 
 import "./LayerUI.scss";
 import "./Toolbar.scss";
@@ -87,7 +91,6 @@ interface LayerUIProps {
   setAppState: React.Component<any, AppState>["setState"];
   elements: readonly NonDeletedExcalidrawElement[];
   onLockToggle: () => void;
-  onHandToolToggle: () => void;
   onPenModeToggle: AppClassProperties["togglePenMode"];
   showExitZenModeBtn: boolean;
   langCode: Language["code"];
@@ -99,8 +102,12 @@ interface LayerUIProps {
   renderWelcomeScreen: boolean;
   children?: React.ReactNode;
   app: AppClassProperties;
+  defaultUIEnabled: boolean;
+  zoomUIEnabled: boolean;
+  scrollBackToContentUIEnabled: boolean;
   isCollaborating: boolean;
   generateLinkForSelection?: AppProps["generateLinkForSelection"];
+  currentUserControls?: ExcalidrawProps["currentUserControls"];
 }
 
 const DefaultMainMenu: React.FC<{
@@ -147,7 +154,6 @@ const LayerUI = ({
   elements,
   canvas,
   onLockToggle,
-  onHandToolToggle,
   onPenModeToggle,
   showExitZenModeBtn,
   renderTopLeftUI,
@@ -158,10 +164,15 @@ const LayerUI = ({
   renderWelcomeScreen,
   children,
   app,
+  defaultUIEnabled,
+  zoomUIEnabled,
+  scrollBackToContentUIEnabled,
   isCollaborating,
   generateLinkForSelection,
+  currentUserControls,
 }: LayerUIProps) => {
   const editorInterface = useEditorInterface();
+  const appProps = useAppProps();
   const stylesPanelMode = useStylesPanelMode();
   const isCompactStylesPanel = stylesPanelMode === "compact";
   const tunnels = useInitializeTunnels();
@@ -229,9 +240,10 @@ const LayerUI = ({
 
   const renderCanvasActions = () => (
     <div style={{ position: "relative" }}>
-      {/* wrapping to Fragment stops React from occasionally complaining
-                about identical Keys */}
-      <tunnels.MainMenuTunnel.Out />
+      <div className="excalidraw-ui-top-left">
+        {renderTopLeftUI?.(false, appState)}
+        <tunnels.MainMenuTunnel.Out />
+      </div>
       {renderWelcomeScreen && <tunnels.WelcomeScreenMenuHintTunnel.Out />}
     </div>
   );
@@ -289,12 +301,11 @@ const LayerUI = ({
   };
 
   const renderFixedSideContainer = () => {
-    const shouldRenderSelectedShapeActions = showSelectedShapeActions(
-      appState,
-      elements,
-    );
+    const shouldRenderSelectedShapeActions =
+      defaultUIEnabled && showSelectedShapeActions(appState, elements);
 
     const shouldShowStats =
+      defaultUIEnabled &&
       appState.stats.open &&
       !appState.zenModeEnabled &&
       !appState.viewModeEnabled &&
@@ -311,24 +322,27 @@ const LayerUI = ({
               {renderCanvasActions()}
               <SaveStatus />
             </Stack.Row>
-            <div
-              className={clsx("selected-shape-actions-container", {
-                "selected-shape-actions-container--compact":
-                  isCompactStylesPanel,
-              })}
-            >
-              {shouldRenderSelectedShapeActions && renderSelectedShapeActions()}
-            </div>
+            {defaultUIEnabled && (
+              <div
+                className={clsx("selected-shape-actions-container", {
+                  "selected-shape-actions-container--compact":
+                    isCompactStylesPanel,
+                })}
+              >
+                {shouldRenderSelectedShapeActions &&
+                  renderSelectedShapeActions()}
+              </div>
+            )}
             {/* in compact UI the pen mode button lives outside the toolbar, as
                 a separate floating button below the compact actions menu
                 (same as we render it on mobile); shown alongside the compact
                 actions island, i.e. when a drawing tool or elements are
                 selected */}
-            {isCompactStylesPanel &&
+            {defaultUIEnabled &&
+              isCompactStylesPanel &&
               !appState.viewModeEnabled &&
               shouldRenderSelectedShapeActions && (
                 <PenModeButton
-                  zenModeEnabled={appState.zenModeEnabled}
                   checked={appState.penMode}
                   onChange={() => onPenModeToggle(null)}
                   title={t("toolBar.penMode")}
@@ -337,7 +351,8 @@ const LayerUI = ({
                 />
               )}
           </Stack.Col>
-          {!appState.viewModeEnabled &&
+          {defaultUIEnabled &&
+            !appState.viewModeEnabled &&
             appState.openDialog?.name !== "elementLinkSelector" && (
               <Section heading="shapes" className="shapes-section">
                 {(heading: React.ReactNode) => (
@@ -352,55 +367,15 @@ const LayerUI = ({
                           "zen-mode": appState.zenModeEnabled,
                         })}
                       >
-                        <Island
-                          padding={spacing.islandPadding}
-                          className={clsx("App-toolbar", {
-                            "zen-mode": appState.zenModeEnabled,
-                            "App-toolbar--compact": isCompactStylesPanel,
-                          })}
-                          data-viewport-ui="top"
-                        >
-                          <HintViewer
-                            appState={appState}
-                            isMobile={editorInterface.formFactor === "phone"}
-                            editorInterface={editorInterface}
-                            app={app}
-                          />
-                          {heading}
-                          <Stack.Row gap={spacing.toolbarInnerRowGap}>
-                            <GridSettings
-                              app={app}
-                              appState={appState}
-                              setAppState={setAppState}
-                            />
-                            {/* in compact UI the pen mode button is rendered
-                                as a separate floating button below the compact
-                                actions menu */}
-                            {!isCompactStylesPanel && (
-                              <PenModeButton
-                                zenModeEnabled={appState.zenModeEnabled}
-                                checked={appState.penMode}
-                                onChange={() => onPenModeToggle(null)}
-                                title={t("toolBar.penMode")}
-                                penDetected={appState.penDetected}
-                              />
-                            )}
-                            <LockButton
-                              checked={appState.activeTool.locked}
-                              onChange={onLockToggle}
-                              title={t("toolBar.lock")}
-                            />
-
-                            <div className="App-toolbar__divider" />
-
-                            <ShapesSwitcher
-                              setAppState={setAppState}
-                              activeTool={appState.activeTool}
-                              UIOptions={UIOptions}
-                              app={app}
-                            />
-                          </Stack.Row>
-                        </Island>
+                        <Toolbar
+                          app={app}
+                          appState={appState}
+                          setAppState={setAppState}
+                          UIOptions={UIOptions}
+                          onPenModeToggle={onPenModeToggle}
+                          onLockToggle={onLockToggle}
+                          heading={heading}
+                        />
                         {isCollaborating && (
                           <Island
                             style={{
@@ -436,10 +411,11 @@ const LayerUI = ({
               },
             )}
           >
-            {appState.collaborators.size > 0 && (
+            {defaultUIEnabled && appState.collaborators.size > 0 && (
               <UserList
                 collaborators={appState.collaborators}
-                userToFollow={appState.userToFollow?.socketId || null}
+                userToFollow={appProps.userToFollow?.socketId || null}
+                currentUserControls={currentUserControls}
               />
             )}
             {renderTopRightUI?.(
@@ -469,6 +445,10 @@ const LayerUI = ({
   };
 
   const renderSidebars = () => {
+    if (!defaultUIEnabled) {
+      return null;
+    }
+
     return (
       <DefaultSidebar
         __fallback
@@ -486,6 +466,11 @@ const LayerUI = ({
   };
 
   const isSidebarDocked = useAtomValue(isSidebarDockedAtom);
+  const isSidebarDockedAndFits = !!(
+    appState.openSidebar &&
+    isSidebarDocked &&
+    editorInterface.canFitSidebar
+  );
 
   const layerUIJSX = (
     <>
@@ -493,81 +478,107 @@ const LayerUI = ({
       {/* make sure we render host app components first so that we can detect
           them first on initial render to optimize layout shift */}
       {children}
-      {/* render component fallbacks. Can be rendered anywhere as they'll be
-          tunneled away. We only render tunneled components that actually
-        have defaults when host do not render anything. */}
-      <DefaultMainMenu UIOptions={UIOptions} />
-      <DefaultSidebar.Trigger
-        __fallback
-        icon={sidebarRightIcon}
-        title={capitalizeString(t("toolBar.library"))}
-        onToggle={(open) => {
-          if (open) {
-            trackEvent(
-              "sidebar",
-              `${DEFAULT_SIDEBAR.name} (open)`,
-              `button (${
-                editorInterface.formFactor === "phone" ? "mobile" : "desktop"
-              })`,
-            );
-          }
-        }}
-        tab={DEFAULT_SIDEBAR.defaultTab}
-      />
+      {/* Fallback entry points are the default UI. Host components above keep
+          rendering into the outlets below even when defaults are disabled. */}
+      {defaultUIEnabled && (
+        <>
+          <DefaultMainMenu UIOptions={UIOptions} />
+          <DefaultSidebar.Trigger
+            __fallback
+            icon={sidebarRightIcon}
+            title={capitalizeString(t("toolBar.library"))}
+            onToggle={(open) => {
+              if (open) {
+                trackEvent(
+                  "sidebar",
+                  `${DEFAULT_SIDEBAR.name} (open)`,
+                  `button (${
+                    editorInterface.formFactor === "phone"
+                      ? "mobile"
+                      : "desktop"
+                  })`,
+                );
+              }
+            }}
+            tab={DEFAULT_SIDEBAR.defaultTab}
+          />
+        </>
+      )}
+      {/* Keep supporting surfaces available to host-supplied UI, including
+          MainMenu.DefaultItems. */}
       <DefaultOverwriteConfirmDialog />
       {appState.openDialog?.name === "ttd" && <TTDDialog __fallback />}
       {/* ------------------------------------------------------------------ */}
 
-      {appState.isLoading && <LoadingMessage delay={250} />}
-      {appState.errorMessage && (
+      {defaultUIEnabled && appState.isLoading && <LoadingMessage delay={250} />}
+      {defaultUIEnabled && appState.errorMessage && (
         <ErrorDialog onClose={() => setAppState({ errorMessage: null })}>
           {appState.errorMessage}
         </ErrorDialog>
       )}
-      {eyeDropperState && editorInterface.formFactor !== "phone" && (
-        <EyeDropper
-          colorPickerType={eyeDropperState.colorPickerType}
-          onCancel={() => {
-            setEyeDropperState(null);
-          }}
-          onChange={(colorPickerType, color, selectedElements, { altKey }) => {
-            if (
-              colorPickerType !== "elementBackground" &&
-              colorPickerType !== "elementStroke"
-            ) {
-              return;
-            }
-
-            if (selectedElements.length) {
-              for (const element of selectedElements) {
-                mutateElement(element, arrayToMap(elements), {
-                  [altKey && eyeDropperState.swapPreviewOnAlt
-                    ? colorPickerType === "elementBackground"
-                      ? "strokeColor"
-                      : "backgroundColor"
-                    : colorPickerType === "elementBackground"
-                    ? "backgroundColor"
-                    : "strokeColor"]: color,
-                });
-                ShapeCache.delete(element);
+      {defaultUIEnabled &&
+        eyeDropperState &&
+        editorInterface.formFactor !== "phone" && (
+          <EyeDropper
+            colorPickerType={eyeDropperState.colorPickerType}
+            onCancel={() => {
+              setEyeDropperState(null);
+            }}
+            onChange={(
+              colorPickerType,
+              color,
+              selectedElements,
+              { altKey },
+            ) => {
+              if (
+                colorPickerType !== "elementBackground" &&
+                colorPickerType !== "elementStroke"
+              ) {
+                return;
               }
-              app.scene.triggerUpdate();
-            } else if (colorPickerType === "elementBackground") {
-              setAppState({
-                currentItemBackgroundColor: color,
+
+              const property =
+                altKey && eyeDropperState.swapPreviewOnAlt
+                  ? colorPickerType === "elementBackground"
+                    ? "strokeColor"
+                    : "backgroundColor"
+                  : colorPickerType === "elementBackground"
+                  ? "backgroundColor"
+                  : "strokeColor";
+
+              if (selectedElements.length) {
+                const elementsMap = arrayToMap(elements);
+                // a note's visible text is its label, so stroke picks
+                // include bound labels
+                const targets = getSelectedElements(elements, appState, {
+                  includeBoundTextElement: property === "strokeColor",
+                });
+                for (const element of targets) {
+                  mutateElement(
+                    element,
+                    elementsMap,
+                    getColorUpdate(element, property, color, elementsMap),
+                  );
+                  ShapeCache.delete(element);
+                }
+                app.scene.triggerUpdate();
+              } else {
+                setAppState(
+                  getColorTargetAppStateUpdates(
+                    resolveColorTarget(appState, elements, property),
+                    color,
+                  ) as Pick<AppState, ColorDefaultKey>,
+                );
+              }
+            }}
+            onSelect={(color, event) => {
+              setEyeDropperState((state) => {
+                return state?.keepOpenOnAlt && event.altKey ? state : null;
               });
-            } else {
-              setAppState({ currentItemStrokeColor: color });
-            }
-          }}
-          onSelect={(color, event) => {
-            setEyeDropperState((state) => {
-              return state?.keepOpenOnAlt && event.altKey ? state : null;
-            });
-            eyeDropperState?.onSelect?.(color, event);
-          }}
-        />
-      )}
+              eyeDropperState?.onSelect?.(color, event);
+            }}
+          />
+        )}
       {appState.openDialog?.name === "help" && (
         <HelpDialog
           onClose={() => {
@@ -576,7 +587,7 @@ const LayerUI = ({
         />
       )}
       <ActiveConfirmDialog />
-      {appState.openDialog?.name === "elementLinkSelector" && (
+      {defaultUIEnabled && appState.openDialog?.name === "elementLinkSelector" && (
         <ElementLinkDialog
           sourceElementId={appState.openDialog.sourceElementId}
           onClose={() => {
@@ -592,7 +603,7 @@ const LayerUI = ({
       <tunnels.OverwriteConfirmDialogTunnel.Out />
       {renderImageExportDialog()}
       {renderJSONExportDialog()}
-      {appState.openDialog?.name === "charts" && (
+      {defaultUIEnabled && appState.openDialog?.name === "charts" && (
         <PasteChartDialog
           data={appState.openDialog.data}
           rawText={appState.openDialog.rawText}
@@ -612,23 +623,36 @@ const LayerUI = ({
           renderJSONExportDialog={renderJSONExportDialog}
           renderImageExportDialog={renderImageExportDialog}
           setAppState={setAppState}
-          onHandToolToggle={onHandToolToggle}
           onPenModeToggle={onPenModeToggle}
           renderTopLeftUI={renderTopLeftUI}
           renderTopRightUI={renderTopRightUI}
           renderSidebars={renderSidebars}
           renderWelcomeScreen={renderWelcomeScreen}
-          UIOptions={UIOptions}
+          defaultUIEnabled={defaultUIEnabled}
+          scrollBackToContentUIEnabled={scrollBackToContentUIEnabled}
         />
       )}
       {editorInterface.formFactor !== "phone" && (
         <>
+          {appProps.viewportStatusFrame?.border && (
+            <ViewportStatusBorder
+              border={appProps.viewportStatusFrame.border}
+              style={
+                isSidebarDockedAndFits
+                  ? {
+                      // flush against the sidebar's own visible edge, not
+                      // just the --right-sidebar-width column it reserves
+                      // (which includes the sidebar's own outer margin)
+                      right: `calc(var(--right-sidebar-width) - var(--space-factor) * 2)`,
+                    }
+                  : undefined
+              }
+            />
+          )}
           <div
             className="layer-ui__wrapper"
             style={
-              appState.openSidebar &&
-              isSidebarDocked &&
-              editorInterface.canFitSidebar
+              isSidebarDockedAndFits
                 ? { width: `calc(100% - var(--right-sidebar-width))` }
                 : {}
             }
@@ -640,8 +664,12 @@ const LayerUI = ({
               actionManager={actionManager}
               showExitZenModeBtn={showExitZenModeBtn}
               renderWelcomeScreen={renderWelcomeScreen}
+              defaultUIEnabled={defaultUIEnabled}
+              zoomUIEnabled={zoomUIEnabled}
             />
-            {(appState.toast || appState.scrolledOutside) && (
+            {(appState.toast ||
+              (scrollBackToContentUIEnabled && appState.scrolledOutside) ||
+              appProps.viewportStatusFrame?.label) && (
               <div className="floating-status-stack">
                 {appState.toast && (
                   <Toast
@@ -651,18 +679,26 @@ const LayerUI = ({
                     closable={appState.toast.closable}
                   />
                 )}
-                {!appState.toast && appState.scrolledOutside && (
-                  <button
-                    type="button"
-                    className="scroll-back-to-content"
-                    onClick={() => {
-                      setAppState((appState) => ({
-                        ...getScrollToContentState(elements, appState),
-                      }));
-                    }}
-                  >
-                    {t("buttons.scrollBackToContent")}
-                  </button>
+                {!appState.toast &&
+                  scrollBackToContentUIEnabled &&
+                  appState.scrolledOutside && (
+                    <button
+                      type="button"
+                      className="scroll-back-to-content"
+                      onClick={() => {
+                        setAppState((appState) => ({
+                          ...getScrollToContentState(elements, appState),
+                        }));
+                      }}
+                    >
+                      {t("buttons.scrollBackToContent")}
+                    </button>
+                  )}
+                {appProps.viewportStatusFrame?.label && (
+                  <ViewportStatusBadge
+                    label={appProps.viewportStatusFrame.label}
+                    border={appProps.viewportStatusFrame.border}
+                  />
                 )}
               </div>
             )}

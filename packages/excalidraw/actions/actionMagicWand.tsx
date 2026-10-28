@@ -4,7 +4,7 @@ import { CaptureUpdateAction } from "@excalidraw/element";
 
 import type { ExcalidrawImageElement } from "@excalidraw/element/types";
 
-import { ToolButton } from "../components/ToolButton";
+import { IconButton } from "../components/IconButton";
 import { MagicIcon } from "../components/icons";
 import { t } from "../i18n";
 
@@ -48,7 +48,7 @@ export const actionToggleMagicWand = register({
     const label = t("helpDialog.magicWandStart");
 
     return (
-      <ToolButton
+      <IconButton
         type="button"
         icon={MagicIcon}
         title={label}

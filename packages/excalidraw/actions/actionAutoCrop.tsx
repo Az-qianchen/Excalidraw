@@ -8,7 +8,7 @@ import {
 
 import type { InitializedExcalidrawImageElement } from "@excalidraw/element/types";
 
-import { ToolButton } from "../components/ToolButton";
+import { IconButton } from "../components/IconButton";
 import { cropAutoIcon } from "../components/icons";
 import { t } from "../i18n";
 
@@ -64,7 +64,7 @@ export const actionAutoCrop = register({
   PanelComponent: ({ updateData }) => {
     const label = t("helpDialog.autoCrop");
     return (
-      <ToolButton
+      <IconButton
         type="button"
         icon={cropAutoIcon}
         title={label}

@@ -22,9 +22,12 @@ import type {
   NonDeletedSceneElementsMap,
 } from "./types";
 
+// `created` is lifetime metadata: it is set once when an element instance is
+// constructed (or duplicated) and never updated, so it is not part of an
+// element update. An explicit repair must construct a new element object.
 export type ElementUpdate<TElement extends ExcalidrawElement> = Omit<
   Partial<TElement>,
-  "id" | "updated"
+  "id" | "updated" | "created"
 >;
 
 /**
@@ -62,7 +65,7 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
       angle: 0 as Radians,
       ...updateElbowArrowPoints(
         {
-          ...element,
+          ...(element as ExcalidrawElbowArrowElement),
           x: updates.x || element.x,
           y: updates.y || element.y,
         },

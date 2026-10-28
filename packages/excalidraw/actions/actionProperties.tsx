@@ -3,10 +3,12 @@ import { pointFrom } from "@excalidraw/math";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  BUCKET_FILL_BACKGROUND_PICKS,
+  COLOR_PALETTE,
   DEFAULT_ELEMENT_BACKGROUND_COLOR_PALETTE,
-  DEFAULT_ELEMENT_BACKGROUND_PICKS,
   DEFAULT_ELEMENT_STROKE_COLOR_PALETTE,
   DEFAULT_ELEMENT_STROKE_PICKS,
+  isTransparent,
   ARROW_TYPE,
   DEFAULT_ADAPTIVE_RADIUS,
   DEFAULT_FONT_FAMILY,
@@ -28,7 +30,14 @@ import {
   type StrokeWidthKey,
 } from "@excalidraw/common";
 
-import { getNonDeletedElements } from "@excalidraw/element";
+import {
+  canBecomePolygon,
+  normalizeStickyNote,
+  toggleLinePolygonState,
+  getNonDeletedElements,
+  isNonDeletedElement,
+  syncStickyNoteInk,
+} from "@excalidraw/element";
 
 import {
   bindBindingElement,
@@ -43,6 +52,8 @@ import { getArrowheadForPicker } from "@excalidraw/element";
 
 import {
   getBoundTextElement,
+  getBaseFontSize,
+  getBaseFontSizeUpdate,
   redrawTextBoundingBox,
 } from "@excalidraw/element";
 
@@ -52,11 +63,18 @@ import {
   isElbowArrow,
   isImageElement,
   isLinearElement,
+  isLineElement,
+  isStickyNoteElement,
   isTextElement,
   isUsingAdaptiveRadius,
 } from "@excalidraw/element";
 
-import { hasStrokeColor } from "@excalidraw/element";
+import {
+  getColorTargetElement,
+  getColorUpdate,
+  hasFillStyle,
+  hasStrokeColor,
+} from "@excalidraw/element";
 
 import {
   updateElbowArrowPoints,
@@ -81,17 +99,19 @@ import type {
   ImageHSLA,
   OuterGlow,
   StrokeVariability,
+  NonDeleted,
+  NonDeletedExcalidrawElement,
   TextAlign,
   VerticalAlign,
 } from "@excalidraw/element/types";
 
-import type { Scene } from "@excalidraw/element";
+import type { ElementUpdate, Scene } from "@excalidraw/element";
 
 import type { CaptureUpdateActionType } from "@excalidraw/element";
 
 import { trackEvent } from "../analytics";
 import { RadioSelection } from "../components/RadioSelection";
-import { ToolButton } from "../components/ToolButton";
+import { IconButton } from "../components/IconButton";
 import { ColorPicker } from "../components/ColorPicker/ColorPicker";
 import { FontPicker } from "../components/FontPicker/FontPicker";
 import { IconPicker } from "../components/IconPicker";
@@ -171,6 +191,10 @@ import {
   getTextSelection,
 } from "../wysiwyg/textEditorState";
 
+import {
+  getColorTargetAppStateUpdates,
+  resolveColorTarget,
+} from "./colorTargets";
 import { register } from "./register";
 
 import type { AppClassProperties, AppState, Primitive } from "../types";
@@ -189,7 +213,7 @@ const getStylesPanelInfo = (app: AppClassProperties) => {
 export const changeProperty = (
   elements: readonly ExcalidrawElement[],
   appState: AppState,
-  callback: (element: ExcalidrawElement) => ExcalidrawElement,
+  callback: (element: NonDeletedExcalidrawElement) => ExcalidrawElement,
   includeBoundText = false,
 ) => {
   const selectedElementIds = arrayToMap(
@@ -203,7 +227,20 @@ export const changeProperty = (
       selectedElementIds.get(element.id) ||
       element.id === appState.editingTextElement?.id
     ) {
-      return callback(element);
+      // selected & editing elements are non-deleted
+      if (!isNonDeletedElement(element)) {
+        // SAFETY: This should never happen, but log it just in case
+        console.error(
+          "[NONDELETED][INVARIANT] changeProperty(): skipping deleted selected/editing element",
+        );
+      }
+      const nextElement = callback(element as NonDeletedExcalidrawElement);
+      // sticky notes keep their data invariants (never-transparent colors,
+      // solid fill, minimum size) whatever property was written; a no-op
+      // normalization returns the same object
+      return isStickyNoteElement(nextElement)
+        ? normalizeStickyNote(nextElement)
+        : nextElement;
     }
     return element;
   });
@@ -282,6 +319,7 @@ const changeFontSize = (
   fallbackValue?: ExcalidrawTextElement["fontSize"],
 ) => {
   const newFontSizes = new Set<number>();
+  const elementsMap = app.scene.getNonDeletedElementsMap();
 
   const updatedElements = changeProperty(
     elements,
@@ -290,15 +328,13 @@ const changeFontSize = (
       if (isTextElement(oldElement)) {
         const newFontSize = getNewFontSize(oldElement);
         newFontSizes.add(newFontSize);
+        const container = app.scene.getContainerElement(oldElement);
 
-        let newElement: ExcalidrawTextElement = newElementWith(oldElement, {
-          fontSize: newFontSize,
-        });
-        redrawTextBoundingBox(
-          newElement,
-          app.scene.getContainerElement(oldElement),
-          app.scene,
+        let newElement: ExcalidrawTextElement = newElementWith(
+          oldElement,
+          getBaseFontSizeUpdate(oldElement, newFontSize, elementsMap),
         );
+        redrawTextBoundingBox(newElement, container, app.scene);
 
         newElement = offsetElementAfterFontResize(
           oldElement,
@@ -365,84 +401,91 @@ export const stripColorPickerUpdateFlags = <T extends ColorPickerUpdate>(
 };
 
 export const actionChangeStrokeColor = register<
-  Pick<AppState, "currentItemStrokeColor"> & ColorPickerUpdate
+  Partial<AppState> & { color?: string } & ColorPickerUpdate
 >({
   name: "changeStrokeColor",
   label: "labels.stroke",
   trackEvent: false,
   perform: (elements, appState, value) => {
-    if (value?.currentItemStrokeColor && appState.editingTextElement) {
+    const { color, preview: _pv, commit: _cm, ...appStateUpdates } = value ?? {};
+    // fork: 富文本选区着色（编辑中且有选区时，把颜色应用到 span）
+    if (color && appState.editingTextElement) {
       const editingId = appState.editingTextElement.id;
       const selection = getTextSelection(editingId);
       if (selection && selection.start !== selection.end) {
-        const applied = applyColorToTextSelection(
-          editingId,
-          value.currentItemStrokeColor,
-        );
+        const applied = applyColorToTextSelection(editingId, color);
         if (applied) {
           return {
-            appState: {
-              ...appState,
-              ...stripColorPickerUpdateFlags(value),
-            },
+            appState: { ...appState, ...appStateUpdates },
             captureUpdate: colorPickerCaptureUpdate(value),
           };
         }
       }
     }
+    if (color === undefined) {
+      return {
+        appState: { ...appState, ...appStateUpdates },
+        captureUpdate: CaptureUpdateAction.EVENTUALLY,
+      };
+    }
+    // resolved from the state the action runs against — never from the
+    // render-time closure of the memoized picker (see `resolveColorTarget`)
+    const target = resolveColorTarget(appState, elements, "strokeColor");
+    const elementsMap = arrayToMap(elements);
 
     return {
-      ...(value?.currentItemStrokeColor && {
-        elements: changeProperty(
+      // a note and its label share one ink: coloring the label while editing
+      // it (no selection) colors the note too — the footer paints with it
+      elements: syncStickyNoteInk(
+        changeProperty(
           elements,
           appState,
-          (el) => {
-            return hasStrokeColor(el.type)
-              ? newElementWith(el, {
-                  strokeColor: value.currentItemStrokeColor,
-                })
-              : el;
-          },
+          (el) =>
+            hasStrokeColor(el.type)
+              ? newElementWith(
+                  el,
+                  getColorUpdate(el, "strokeColor", color, elementsMap),
+                )
+              : el,
           true,
         ),
-      }),
+        elementsMap,
+      ),
       appState: {
         ...appState,
-        ...stripColorPickerUpdateFlags(value),
+        ...appStateUpdates,
+        ...getColorTargetAppStateUpdates(target, color),
       },
-      captureUpdate: !!value?.currentItemStrokeColor
-        ? colorPickerCaptureUpdate(value)
-        : CaptureUpdateAction.EVENTUALLY,
+      captureUpdate: colorPickerCaptureUpdate(value),
     };
   },
-  PanelComponent: ({ elements, appState, updateData, app, data }) => {
+  PanelComponent: ({ elements, appState, updateData, app }) => {
     const { stylesPanelMode } = getStylesPanelInfo(app);
+    const target = resolveColorTarget(appState, elements, "strokeColor");
+    // a note has no stroke: its "stroke" is the ink of its text and footer
+    const label =
+      target.kind === "sticky" ? t("labels.textColor") : t("labels.stroke");
 
     return (
       <>
-        {stylesPanelMode === "full" && (
-          <h3 aria-hidden="true">{t("labels.stroke")}</h3>
-        )}
+        {stylesPanelMode === "full" && <h3 aria-hidden="true">{label}</h3>}
         <ColorPicker
-          topPicks={DEFAULT_ELEMENT_STROKE_PICKS}
-          palette={DEFAULT_ELEMENT_STROKE_COLOR_PALETTE}
+          topPicks={target.topPicks}
+          palette={target.palette}
+          customizableTopPicks={target.customizableTopPicks}
+          excludedColors={target.excludedColors}
           type="elementStroke"
-          label={t("labels.stroke")}
+          label={label}
           color={getFormValue(
             elements,
             app,
             (element) => element.strokeColor,
             true,
-            (hasSelection) =>
-              !hasSelection ? appState.currentItemStrokeColor : null,
+            (hasSelection) => (!hasSelection ? target.currentValue : null),
           )}
-          onChange={(color) => updateData({ currentItemStrokeColor: color })}
-          onSliderPreview={(color) =>
-            updateData({ currentItemStrokeColor: color, preview: true })
-          }
-          onSliderCommit={(color) =>
-            updateData({ currentItemStrokeColor: color, commit: true })
-          }
+          onChange={(color) => updateData({ color })}
+          onSliderPreview={(color) => updateData({ color, preview: true })}
+          onSliderCommit={(color) => updateData({ color, commit: true })}
           elements={elements}
           appState={appState}
           updateData={updateData}
@@ -453,39 +496,140 @@ export const actionChangeStrokeColor = register<
 });
 
 export const actionChangeBackgroundColor = register<
-  Pick<AppState, "currentItemBackgroundColor" | "viewBackgroundColor"> &
-    ColorPickerUpdate
+  Partial<AppState> & { color?: string } & ColorPickerUpdate
 >({
   name: "changeBackgroundColor",
   label: "labels.changeBackground",
   trackEvent: false,
   perform: (elements, appState, value, app) => {
-    if (!value?.currentItemBackgroundColor) {
+    const { color, ...appStateUpdates } = value ?? {};
+    if (color === undefined) {
       return {
-        appState: {
-          ...appState,
-          ...stripColorPickerUpdateFlags(value),
-        },
+        appState: { ...appState, ...appStateUpdates },
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
       };
     }
+    const target = resolveColorTarget(appState, elements, "backgroundColor");
+    const elementsMap = arrayToMap(elements);
 
-    const nextElements = changeProperty(elements, appState, (el) =>
-      newElementWith(el, {
-        backgroundColor: value.currentItemBackgroundColor,
-      }),
-    );
+    let nextElements;
+
+    const selectedElements = app.scene.getSelectedElements(appState);
+    const shouldEnablePolygon =
+      !isTransparent(color) &&
+      // `every` is vacuously true with nothing selected (editing text)
+      selectedElements.length > 0 &&
+      selectedElements.every(
+        (el) => isLineElement(el) && canBecomePolygon(el.points),
+      );
+
+    if (shouldEnablePolygon) {
+      const selectedElementsMap = arrayToMap(selectedElements);
+      nextElements = elements.map((el) => {
+        if (selectedElementsMap.has(el.id) && isLineElement(el)) {
+          return newElementWith(el, {
+            backgroundColor: color,
+            ...toggleLinePolygonState(el, true),
+          });
+        }
+        return el;
+      });
+    } else {
+      nextElements = changeProperty(elements, appState, (el) =>
+        // a note's label passes the pick on to the note (below)
+        getColorTargetElement(el, "backgroundColor", elementsMap) === el
+          ? newElementWith(
+              el,
+              getColorUpdate(el, "backgroundColor", color, elementsMap),
+            )
+          : el,
+      );
+      // editing a note's label (no selection): the label has no fill, the
+      // pick colors the note — text and background in one editing pass
+      const editingText =
+        appState.editingTextElement &&
+        elementsMap.get(appState.editingTextElement.id);
+      const editingTarget =
+        editingText &&
+        getColorTargetElement(editingText, "backgroundColor", elementsMap);
+      if (editingTarget && editingTarget !== editingText) {
+        nextElements = nextElements.map((el) =>
+          el.id === editingTarget.id
+            ? newElementWith(
+                el,
+                getColorUpdate(el, "backgroundColor", color, elementsMap),
+              )
+            : el,
+        );
+      }
+    }
 
     return {
       elements: nextElements,
       appState: {
         ...appState,
-        ...stripColorPickerUpdateFlags(value),
+        ...appStateUpdates,
+        ...getColorTargetAppStateUpdates(target, color),
       },
       captureUpdate: colorPickerCaptureUpdate(value),
     };
   },
-  PanelComponent: ({ elements, appState, updateData, app, data }) => {
+  PanelComponent: ({ elements, appState, updateData, app }) => {
+    const { stylesPanelMode } = getStylesPanelInfo(app);
+    const target = resolveColorTarget(appState, elements, "backgroundColor");
+    // while editing a note's label the picker shows and sets the note's fill
+    const elementsMap = app.scene.getNonDeletedElementsMap();
+
+    return (
+      <>
+        {stylesPanelMode === "full" && (
+          <h3 aria-hidden="true">{t("labels.background")}</h3>
+        )}
+        <ColorPicker
+          topPicks={target.topPicks}
+          palette={target.palette}
+          customizableTopPicks={target.customizableTopPicks}
+          excludedColors={target.excludedColors}
+          type="elementBackground"
+          label={t("labels.background")}
+          color={getFormValue(
+            elements,
+            app,
+            (element) =>
+              getColorTargetElement(element, "backgroundColor", elementsMap)
+                .backgroundColor,
+            true,
+            (hasSelection) => (!hasSelection ? target.currentValue : null),
+          )}
+          onChange={(color) => updateData({ color })}
+          elements={elements}
+          appState={appState}
+          updateData={updateData}
+        />
+      </>
+    );
+  },
+});
+
+export const actionChangeBucketFillBackgroundColor = register<
+  Pick<AppState, "currentItemBackgroundColor">
+>({
+  name: "changeBucketFillBackgroundColor",
+  label: "labels.changeBackground",
+  trackEvent: false,
+  // the bucket fill tool has no element to mutate; it shares
+  // `currentItemBackgroundColor` but hides `transparent` (an invisible fill
+  // would be a no-op) and shows the effective fallback color instead
+  perform: (elements, appState, value) => {
+    return {
+      appState: {
+        ...appState,
+        ...value,
+      },
+      captureUpdate: CaptureUpdateAction.EVENTUALLY,
+    };
+  },
+  PanelComponent: ({ elements, appState, updateData, app }) => {
     const { stylesPanelMode } = getStylesPanelInfo(app);
 
     return (
@@ -494,17 +638,19 @@ export const actionChangeBackgroundColor = register<
           <h3 aria-hidden="true">{t("labels.background")}</h3>
         )}
         <ColorPicker
-          topPicks={DEFAULT_ELEMENT_BACKGROUND_PICKS}
+          topPicks={BUCKET_FILL_BACKGROUND_PICKS}
           palette={DEFAULT_ELEMENT_BACKGROUND_COLOR_PALETTE}
+          // hidden rather than removed from the palette so the remaining
+          // colors keep their usual hotkeys (w for white etc.)
+          excludedColors={[COLOR_PALETTE.transparent]}
+          // customized independently of the background picker's picks even
+          // though both drive `currentItemBackgroundColor` — the bucket
+          // strip's defaults and use case differ (no transparent)
+          customizableTopPicks="bucketFill"
           type="elementBackground"
           label={t("labels.background")}
-          color={getFormValue(
-            elements,
-            app,
-            (element) => element.backgroundColor,
-            true,
-            (hasSelection) =>
-              !hasSelection ? appState.currentItemBackgroundColor : null,
+          color={app.bucketFill.getBucketFillBackgroundColor(
+            appState.currentItemBackgroundColor,
           )}
           onChange={(color) =>
             updateData({ currentItemBackgroundColor: color })
@@ -541,9 +687,7 @@ export const actionChangeFillStyle = register<ExcalidrawElement["fillStyle"]>({
     );
     return {
       elements: changeProperty(elements, appState, (el) =>
-        newElementWith(el, {
-          fillStyle: value,
-        }),
+        hasFillStyle(el.type) ? newElementWith(el, { fillStyle: value }) : el,
       ),
       appState: { ...appState, currentItemFillStyle: value },
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
@@ -551,9 +695,12 @@ export const actionChangeFillStyle = register<ExcalidrawElement["fillStyle"]>({
   },
   PanelComponent: ({ elements, appState, updateData, app }) => {
     const selectedElements = getSelectedElements(elements, appState);
+    const selectedFillStyleElements = selectedElements.filter((element) =>
+      hasFillStyle(element.type),
+    );
     const allElementsZigZag =
-      selectedElements.length > 0 &&
-      selectedElements.every((el) => el.fillStyle === "zigzag");
+      selectedFillStyleElements.length > 0 &&
+      selectedFillStyleElements.every((el) => el.fillStyle === "zigzag");
 
     return (
       <fieldset>
@@ -588,7 +735,7 @@ export const actionChangeFillStyle = register<ExcalidrawElement["fillStyle"]>({
               elements,
               app,
               (element) => element.fillStyle,
-              (element) => element.hasOwnProperty("fillStyle"),
+              (element) => hasFillStyle(element.type),
               (hasSelection) =>
                 hasSelection ? null : appState.currentItemFillStyle,
             )}
@@ -596,7 +743,9 @@ export const actionChangeFillStyle = register<ExcalidrawElement["fillStyle"]>({
               const nextValue =
                 event.altKey &&
                 value === "hachure" &&
-                selectedElements.every((el) => el.fillStyle === "hachure")
+                selectedFillStyleElements.every(
+                  (el) => el.fillStyle === "hachure",
+                )
                   ? "zigzag"
                   : value;
 
@@ -785,7 +934,7 @@ export const actionChangeFreedrawMode = register<StrokeVariability>({
     if (data?.cycle) {
       const isVariable = strokeVariability === "variable";
       return (
-        <ToolButton
+        <IconButton
           type="button"
           icon={
             isVariable
@@ -1287,15 +1436,16 @@ export const actionChangeFontSize = register<ExcalidrawTextElement["fontSize"]>(
                 elements,
                 app,
                 (element) => {
+                  const elementsMap = app.scene.getNonDeletedElementsMap();
                   if (isTextElement(element)) {
-                    return element.fontSize;
+                    return getBaseFontSize(element, elementsMap);
                   }
                   const boundTextElement = getBoundTextElement(
                     element,
-                    app.scene.getNonDeletedElementsMap(),
+                    elementsMap,
                   );
                   if (boundTextElement) {
-                    return boundTextElement.fontSize;
+                    return getBaseFontSize(boundTextElement, elementsMap);
                   }
                   return null;
                 },
@@ -1336,7 +1486,8 @@ export const actionDecreaseFontSize = register({
       Math.round(
         // get previous value before relative increase (doesn't work fully
         // due to rounding and float precision issues)
-        (1 / (1 + FONT_SIZE_RELATIVE_INCREASE_STEP)) * element.fontSize,
+        (1 / (1 + FONT_SIZE_RELATIVE_INCREASE_STEP)) *
+          getBaseFontSize(element, app.scene.getNonDeletedElementsMap()),
       ),
     );
   },
@@ -1357,7 +1508,10 @@ export const actionIncreaseFontSize = register({
   trackEvent: false,
   perform: (elements, appState, value, app) => {
     return changeFontSize(elements, appState, app, (element) =>
-      Math.round(element.fontSize * (1 + FONT_SIZE_RELATIVE_INCREASE_STEP)),
+      Math.round(
+        getBaseFontSize(element, app.scene.getNonDeletedElementsMap()) *
+          (1 + FONT_SIZE_RELATIVE_INCREASE_STEP),
+      ),
     );
   },
   keyTest: (event) => {
@@ -1404,7 +1558,7 @@ export const actionChangeFontFamily = register<{
           if (cachedElement) {
             const newElement = newElementWith(element, {
               ...cachedElement,
-            });
+            } as ElementUpdate<NonDeletedExcalidrawElement>);
 
             return newElement;
           }
@@ -1549,8 +1703,9 @@ export const actionChangeFontFamily = register<{
         fontFamily: nextFontFamily,
       })}`;
       const chars = Array.from(uniqueChars.values()).join();
+      const ownerDocument = app.props.ownerDocument ?? document;
 
-      if (skipFontFaceCheck || window.document.fonts.check(fontString, chars)) {
+      if (skipFontFaceCheck || ownerDocument.fonts.check(fontString, chars)) {
         // we either skip the check (have at least one font face loaded) or do the check and find out all the font faces have loaded
         for (const [element, container] of elementContainerMapping) {
           // trigger synchronous redraw
@@ -1558,7 +1713,7 @@ export const actionChangeFontFamily = register<{
         }
       } else {
         // otherwise try to load all font faces for the given chars and redraw elements once our font faces loaded
-        window.document.fonts.load(fontString, chars).then((fontFaces) => {
+        ownerDocument.fonts.load(fontString, chars).then((fontFaces) => {
           for (const [element, container] of elementContainerMapping) {
             // use latest element state to ensure we don't have closure over an old instance in order to avoid possible race conditions (i.e. font faces load out-of-order while rapidly switching fonts)
             const latestElement = app.scene.getElement(element.id);
@@ -1758,7 +1913,7 @@ export const actionChangeFontFamily = register<{
 
               // Refocus text editor when font picker closes if we were editing text
               if (isCompact && appState.editingTextElement) {
-                restoreCaretPosition(null); // Just refocus without saved position
+                restoreCaretPosition(null, app.ownerDocument); // Just refocus without saved position
               }
             }
           }}
@@ -2050,7 +2205,7 @@ export const actionChangeRoundness = register<"sharp" | "round">({
           return el;
         }
 
-        return newElementWith(el, {
+        const nextElement = newElementWith(el, {
           roundness:
             value === "round"
               ? {
@@ -2060,6 +2215,8 @@ export const actionChangeRoundness = register<"sharp" | "round">({
                 }
               : null,
         });
+
+        return nextElement;
       }),
       appState: {
         ...appState,
@@ -2481,13 +2638,13 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
             endBinding,
             fixedSegments: null,
           }),
-        };
+        } as typeof newElement;
       } else {
         const elementsMap = app.scene.getNonDeletedElementsMap();
         if (newElement.startBinding) {
           const startElement = elementsMap.get(
             newElement.startBinding.elementId,
-          ) as ExcalidrawBindableElement;
+          ) as NonDeleted<ExcalidrawBindableElement>;
           if (startElement) {
             bindBindingElement(
               newElement,
@@ -2501,7 +2658,7 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
         if (newElement.endBinding) {
           const endElement = elementsMap.get(
             newElement.endBinding.elementId,
-          ) as ExcalidrawBindableElement;
+          ) as NonDeleted<ExcalidrawBindableElement>;
           if (endElement) {
             bindBindingElement(
               newElement,
@@ -2529,7 +2686,7 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
       const selected = newElements.find((el) => el.id === selectedId);
       if (selected) {
         newState.selectedLinearElement = new LinearElementEditor(
-          selected as ExcalidrawLinearElement,
+          selected as NonDeleted<ExcalidrawLinearElement>,
           arrayToMap(elements),
         );
       }

@@ -57,6 +57,7 @@ const TYPE_ICON: Record<NonDeletedExcalidrawElement["type"], React.ReactNode> =
     line: LineIcon,
     arrow: ArrowIcon,
     freedraw: FreedrawIcon,
+    stickynote: RectangleIcon,
     image: ImageIcon,
     frame: frameToolIcon,
     magicframe: frameToolIcon,
@@ -286,7 +287,7 @@ export const LayersMenu = () => {
     (groupId: string) => {
       mutateAndSync(() => {
         const groupEls = getElementsInGroup(
-          app.scene.getElementsMapIncludingDeleted(),
+          app.scene.getNonDeletedElementsMap(),
           groupId,
         ) as NonDeletedExcalidrawElement[];
         if (groupEls.length === 0) {
@@ -309,7 +310,7 @@ export const LayersMenu = () => {
     (groupId: string) => {
       mutateAndSync(() => {
         const groupEls = getElementsInGroup(
-          app.scene.getElementsMapIncludingDeleted(),
+          app.scene.getNonDeletedElementsMap(),
           groupId,
         ) as NonDeletedExcalidrawElement[];
         if (groupEls.length === 0) {
@@ -323,7 +324,10 @@ export const LayersMenu = () => {
             // hide
             app.scene.mutateElement(
               el,
-              { isDeleted: true, customData: { ...customData, hidden: true } },
+              {
+                isDeleted: true,
+                customData: { ...customData, hidden: true },
+              } as any,
               { informMutation: true, isDragging: false },
             );
           } else {
@@ -331,7 +335,7 @@ export const LayersMenu = () => {
             const { hidden: _h, ...rest } = customData;
             app.scene.mutateElement(
               el,
-              { isDeleted: false, customData: rest },
+              { isDeleted: false, customData: rest } as any,
               { informMutation: true, isDragging: false },
             );
           }
@@ -345,7 +349,7 @@ export const LayersMenu = () => {
     (groupId: string) => {
       mutateAndSync(() => {
         const groupEls = getElementsInGroup(
-          app.scene.getElementsMapIncludingDeleted(),
+          app.scene.getNonDeletedElementsMap(),
           groupId,
         ) as NonDeletedExcalidrawElement[];
         groupEls.forEach((el) => {
@@ -354,7 +358,7 @@ export const LayersMenu = () => {
           const { hidden: _h, ...rest } = customData;
           app.scene.mutateElement(
             el,
-            { isDeleted: true, customData: rest },
+            { isDeleted: true, customData: rest } as any,
             { informMutation: true, isDragging: false },
           );
         });
@@ -463,7 +467,10 @@ export const LayersMenu = () => {
         if (!hidden) {
           app.scene.mutateElement(
             element,
-            { isDeleted: true, customData: { ...customData, hidden: true } },
+            {
+              isDeleted: true,
+              customData: { ...customData, hidden: true },
+            } as any,
             { informMutation: true, isDragging: false },
           );
         } else {
@@ -487,7 +494,7 @@ export const LayersMenu = () => {
         const { hidden: _h, ...rest } = customData;
         app.scene.mutateElement(
           element,
-          { isDeleted: true, customData: rest },
+          { isDeleted: true, customData: rest } as any,
           { informMutation: true, isDragging: false },
         );
       });
@@ -586,7 +593,7 @@ export const LayersMenu = () => {
         if (position === "inside") {
           // Drag group into another group
           const targetGroupEls = getElementsInGroup(
-            app.scene.getElementsMapIncludingDeleted(),
+            app.scene.getNonDeletedElementsMap(),
             targetId,
           );
           if (targetGroupEls.length > 0) {
@@ -611,12 +618,14 @@ export const LayersMenu = () => {
         let anchorEl: NonDeletedExcalidrawElement | undefined;
         if (isTargetGroup) {
           const targetGroupEls = getElementsInGroup(
-            app.scene.getElementsMapIncludingDeleted(),
+            app.scene.getNonDeletedElementsMap(),
             targetId,
           );
-          anchorEl = targetGroupEls[0];
+          anchorEl = targetGroupEls[0] as NonDeletedExcalidrawElement;
         } else {
-          anchorEl = remaining.find((e) => e.id === targetId);
+          anchorEl = remaining.find(
+            (e) => e.id === targetId,
+          ) as NonDeletedExcalidrawElement | undefined;
         }
         if (!anchorEl) {
           return;
@@ -858,7 +867,7 @@ export const LayersMenu = () => {
                 dropTarget?.id === node.groupId &&
                 dropTarget.position === "inside";
               const groupEls = getElementsInGroup(
-                app.scene.getElementsMapIncludingDeleted(),
+                app.scene.getNonDeletedElementsMap(),
                 node.groupId,
               ) as NonDeletedExcalidrawElement[];
               const isGroupLocked = groupEls.every((el) => el.locked);
