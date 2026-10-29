@@ -30,7 +30,11 @@ import {
 
 import { t } from "../i18n";
 import { getSelectedElements, isSomeElementSelected } from "../scene";
-import { exportScene, getExportConfigFromAppState } from "../scene/export";
+import {
+  exportScene,
+  getExportConfigFromAppState,
+  type ExportSceneConfig,
+} from "../scene/export";
 
 import { canvasToBlob } from "./blob";
 import { fileSave } from "./filesystem";
@@ -107,6 +111,7 @@ export const exportCanvas = async (
     fileHandle = null,
     exportingFrame = null,
     renderEnvironment,
+    canvasBackgroundColor,
   }: {
     exportPadding?: number;
     /** filename, if applicable */
@@ -114,6 +119,8 @@ export const exportCanvas = async (
     fileHandle?: FileSystemFileHandle | null;
     exportingFrame: NonDeleted<ExcalidrawFrameLikeElement> | null;
     renderEnvironment?: RenderEnvironment;
+    /** overrides the appState-derived background; `false` = transparent */
+    canvasBackgroundColor?: ExportSceneConfig["canvasBackgroundColor"];
   },
 ) => {
   if (elements.length === 0) {
@@ -122,6 +129,9 @@ export const exportCanvas = async (
 
   const config = {
     ...getExportConfigFromAppState(appState),
+    ...(canvasBackgroundColor !== undefined
+      ? { canvasBackgroundColor }
+      : undefined),
     padding: exportPadding,
     exportingFrame,
   };
