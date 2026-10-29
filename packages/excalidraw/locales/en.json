@@ -209,7 +209,10 @@
     "midpointSnapping": "Snap to midpoints",
     "layers": "Layers",
     "files": "Files",
-    "filesSectionTitle": "Files"
+    "filesSectionTitle": "Files",
+    "inputDevice": "Input",
+    "inputDeviceTrackpad": "Trackpad",
+    "inputDeviceMouse": "Mouse"
   },
   "elementLink": {
     "title": "Link to object",
