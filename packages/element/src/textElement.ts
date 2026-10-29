@@ -32,6 +32,8 @@ import {
 
 import { isNonDeletedElement } from ".";
 
+import type { RenderEnvironment } from "./renderEnvironment";
+
 import type { Scene } from "./Scene";
 
 import type { MaybeTransformHandleType } from "./transformHandles";
@@ -254,6 +256,7 @@ export const redrawTextBoundingBox = (
   textElement: ExcalidrawTextElement,
   container: ExcalidrawElement | null,
   scene: Scene,
+  renderEnvironment?: RenderEnvironment,
 ) => {
   const elementsMap = scene.getNonDeletedElementsMap();
 
@@ -261,7 +264,10 @@ export const redrawTextBoundingBox = (
     // the sticky fit owns both halves (label + note geometry). `textElement`
     // may be an uncommitted clone (font actions clone before install), so it
     // is passed explicitly instead of looked up in the scene
-    updateStickyNoteLayout(container, scene, { text: textElement });
+    updateStickyNoteLayout(container, scene, {
+      text: textElement,
+      renderEnvironment,
+    });
     return;
   }
 
@@ -297,6 +303,7 @@ export const redrawTextBoundingBox = (
       textElement.originalText,
       getFontString(textElement),
       maxWidth,
+      renderEnvironment,
     );
   }
 
@@ -304,6 +311,7 @@ export const redrawTextBoundingBox = (
     boundTextUpdates.text,
     getFontString(textElement),
     textElement.lineHeight,
+    renderEnvironment,
   );
 
   // Note: only update width for unwrapped text and bound texts (which always have autoResize set to true)
@@ -338,11 +346,15 @@ export const handleBindTextResize = (
   shouldMaintainAspectRatio = false,
   shouldResizeFromCenter = false,
   flipByY = false,
+  renderEnvironment?: RenderEnvironment,
 ) => {
   if (isStickyNoteElement(container)) {
     // resize callers pass their intents to `updateStickyNoteLayout` directly
     // and own the bound-arrow pass; this is the fallback for generic callers
-    updateStickyNoteLayout(container, scene, { bindings: false });
+    updateStickyNoteLayout(container, scene, {
+      bindings: false,
+      renderEnvironment,
+    });
     return;
   }
   const elementsMap = scene.getNonDeletedElementsMap();
@@ -372,12 +384,14 @@ export const handleBindTextResize = (
           textElement.originalText,
           getFontString(textElement),
           maxWidth,
+          renderEnvironment,
         );
       }
       const metrics = measureText(
         text,
         getFontString(textElement),
         textElement.lineHeight,
+        renderEnvironment,
       );
       nextHeight = metrics.height;
       nextWidth = metrics.width;

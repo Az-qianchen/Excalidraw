@@ -645,6 +645,7 @@ export const textWysiwyg = ({
       editable.value,
       layout.font,
       whiteSpace === "pre-wrap" ? layout.width : Infinity,
+      app.renderEnvironment,
     );
     const lineIndex = Math.max(
       0,
@@ -652,7 +653,11 @@ export const textWysiwyg = ({
     );
     const line = lines[lineIndex];
     const direction = getLineDirection(editable.value, line.start);
-    const lineWidth = getLineWidth(line.text, layout.font);
+    const lineWidth = getLineWidth(
+      line.text,
+      layout.font,
+      app.renderEnvironment,
+    );
     const lineStartX =
       layout.textAlign === "center"
         ? (layout.width - lineWidth) / 2
@@ -886,8 +891,16 @@ export const textWysiwyg = ({
         const { selectionStart, selectionEnd, value } = editable;
         const nextText =
           value.slice(0, selectionStart) + text + value.slice(selectionEnd);
-        const wrappedText = wrapText(nextText, font, maxWidth);
-        const width = Math.min(getTextWidth(wrappedText, font), maxWidth);
+        const wrappedText = wrapText(
+          nextText,
+          font,
+          maxWidth,
+          app.renderEnvironment,
+        );
+        const width = Math.min(
+          getTextWidth(wrappedText, font, app.renderEnvironment),
+          maxWidth,
+        );
         editable.style.width = `${width}px`;
       }
     };
@@ -1167,7 +1180,12 @@ export const textWysiwyg = ({
         });
       }
 
-      redrawTextBoundingBox(updateElement, container, app.scene);
+      redrawTextBoundingBox(
+        updateElement,
+        container,
+        app.scene,
+        app.renderEnvironment,
+      );
     }
 
     onSubmit({
