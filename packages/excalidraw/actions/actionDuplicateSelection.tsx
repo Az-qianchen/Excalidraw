@@ -4,10 +4,7 @@ import { getNonDeletedElements } from "@excalidraw/element";
 
 import { LinearElementEditor } from "@excalidraw/element";
 
-import {
-  getSelectedElements,
-  getSelectionStateForElements,
-} from "@excalidraw/element";
+import { getSelectedElements } from "@excalidraw/element";
 
 import { syncMovedIndices } from "@excalidraw/element";
 
@@ -23,6 +20,8 @@ import { isSomeElementSelected } from "../scene";
 import { getShortcutKey } from "../shortcut";
 
 import { useStylesPanelMode } from "../components/App";
+
+import { getSelectionStateForElements } from "../components/App.selection";
 
 import { register } from "./register";
 
@@ -92,6 +91,8 @@ export const actionDuplicateSelection = register({
         return false;
       }
     }
+
+    app.duplicate.advanceListMarkers(duplicatedElements);
 
     return {
       elements: syncMovedIndices(

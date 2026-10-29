@@ -147,6 +147,7 @@ export type ActionName =
   | "maskEditor"
   | "magicWand"
   | "wrapSelectionInFrame"
+  | "toggleWrap"
   | "toggleShapeSwitch"
   | "togglePolygon";
 
