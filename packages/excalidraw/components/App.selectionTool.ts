@@ -1,9 +1,11 @@
 import {
   CURSOR_TYPE,
+  DEFAULT_ADAPTIVE_RADIUS,
   DRAGGING_THRESHOLD,
   getGridPoint,
   isSelectionLikeTool,
   KEYS,
+  ROUNDNESS,
   shouldMaintainAspectRatio,
   shouldResizeFromCenter,
   shouldRotateWithDiscreteAngle,
@@ -27,6 +29,7 @@ import {
   getUncroppedWidthAndHeight,
   handleFocusPointPointerDown,
   hitElementBoundingBoxOnly,
+  hitTestCornerRadiusHandle,
   isBindingElement,
   isElbowArrow,
   isElementInFrame,
@@ -114,6 +117,44 @@ export class AppSelectionTool {
       const selectedElements = this.app.scene.getSelectedElements(
         this.app.state,
       );
+
+      // fork: 检查圆角手柄点击（优先于普通 transform handle）
+      if (
+        selectedElements.length === 1 &&
+        !this.app.state.croppingElementId &&
+        !this.app.state.maskingElementId &&
+        !this.app.state.magicWandElementId &&
+        !this.app.state.selectedLinearElement?.isEditing &&
+        !isElbowArrow(selectedElements[0]) &&
+        !(
+          isLinearElement(selectedElements[0]) &&
+          (this.app.editorInterface.userAgent.isMobileDevice ||
+            selectedElements[0].points.length === 2)
+        ) &&
+        !(
+          this.app.state.selectedLinearElement &&
+          this.app.state.selectedLinearElement.hoverPointIndex !== -1
+        ) &&
+        hitTestCornerRadiusHandle(
+          selectedElements[0],
+          this.app.state.zoom,
+          pointerDownState.origin.x,
+          pointerDownState.origin.y,
+        )
+      ) {
+        const element = selectedElements[0];
+        const originalValue =
+          element.roundness?.type === ROUNDNESS.ADAPTIVE_RADIUS
+            ? element.roundness.value ?? DEFAULT_ADAPTIVE_RADIUS
+            : 0;
+        this.app.cornerRadiusDrag = {
+          elementId: element.id,
+          originalValue,
+          initialPointerX: pointerDownState.origin.x,
+        };
+        this.app.store.scheduleCapture();
+        return false;
+      }
 
       const transformHandle = this.getTransformHandleAt(
         selectedElements,
