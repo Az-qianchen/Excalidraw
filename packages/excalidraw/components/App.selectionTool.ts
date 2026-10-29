@@ -550,7 +550,9 @@ export class AppSelectionTool {
           ),
         );
 
-        updateBoundElements(croppingElement, this.app.scene);
+        updateBoundElements(croppingElement, this.app.scene, {
+          renderEnvironment: this.app.renderEnvironment,
+        });
 
         this.app.setState({
           isCropping: true,
@@ -596,7 +598,9 @@ export class AppSelectionTool {
     if (updates) {
       this.app.store.scheduleCapture();
       this.app.scene.mutateElement(image, updates);
-      updateBoundElements(image, this.app.scene);
+      updateBoundElements(image, this.app.scene, {
+        renderEnvironment: this.app.renderEnvironment,
+      });
     }
     return true;
   };
@@ -1032,6 +1036,7 @@ export class AppSelectionTool {
             this.app.scene,
             snapOffset,
             event[KEYS.CTRL_OR_CMD] ? null : this.app.getEffectiveGridSize(),
+            this.app.renderEnvironment,
           );
         }
 
