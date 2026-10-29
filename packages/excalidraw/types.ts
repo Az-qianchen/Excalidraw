@@ -234,7 +234,7 @@ export type InteractiveCanvasAppState = Readonly<
     isMidpointSnappingEnabled: AppState["isMidpointSnappingEnabled"];
     gridModeEnabled: AppState["gridModeEnabled"];
     suggestedBinding: AppState["suggestedBinding"];
-    hoveredArrowTextAnchor: AppState["hoveredArrowTextAnchor"];
+    textToolHover: AppState["textToolHover"];
     isRotating: AppState["isRotating"];
     elementsToHighlight: AppState["elementsToHighlight"];
     // Collaborators
@@ -381,6 +381,8 @@ export interface AppState {
   bindingPreference: "enabled" | "disabled";
   /** user preference whether arrow snap to midpoints while binding */
   isMidpointSnappingEnabled: boolean;
+  /** user preference whether to show contextual hints above the toolbar */
+  showHints: boolean;
   /**
    * user preference for what the wheel does: with a `trackpad` a plain wheel
    * pans; with a `mouse` a plain wheel zooms. Ctrl/cmd+wheel (how a pinch is
@@ -398,14 +400,21 @@ export interface AppState {
     midPoint?: GlobalPoint;
   } | null;
   /**
-   * Where on a hovered arrow the text tool would attach text if clicked —
-   * a free endpoint (binds the arrow to a new text element positioned against
-   * that endpoint) or the arrow's midpoint (adds a label bound to the arrow).
+   * What a text-tool click at the hovered position would act on — the text
+   * it would edit, the empty container it would label, or the arrow anchor
+   * (a free endpoint, or the midpoint for a label) it would attach text to.
+   * `null` when the click would create free text, or the tool isn't active.
+   * Drives the hover affordance only.
    */
-  hoveredArrowTextAnchor: {
-    elementId: ExcalidrawArrowElement["id"];
-    anchor: "start" | "end" | "label";
-  } | null;
+  textToolHover:
+    | { type: "text"; elementId: ExcalidrawElement["id"] }
+    | { type: "container"; elementId: ExcalidrawElement["id"] }
+    | {
+        type: "arrow";
+        elementId: ExcalidrawArrowElement["id"];
+        anchor: "start" | "end" | "label";
+      }
+    | null;
   frameToHighlight: NonDeleted<ExcalidrawFrameLikeElement> | null;
   frameRendering: {
     enabled: boolean;
@@ -417,6 +426,10 @@ export interface AppState {
    * frame-like element whose name is currently being edited
    */
   editingFrame: ExcalidrawFrameLikeElement["id"] | null;
+  /**
+   * Elements the UI highlights with a bounding-box outline — those that
+   * would get added to a frame being dragged/resized.
+   */
   elementsToHighlight: readonly NonDeletedExcalidrawElement[] | null;
   /**
    * set when a new text is created or when an existing text is being edited
@@ -598,6 +611,9 @@ export interface AppState {
     stickyNoteStroke: readonly string[] | null;
     stickyNoteBackground: readonly string[] | null;
   };
+  /** user-customized font-picker top picks (pinned via drag & drop from the
+   * font picker popup). `null` means no customization (defaults are used) */
+  fontTopPicks: readonly FontFamilyValues[] | null;
 }
 
 export type SearchMatch = {
@@ -627,7 +643,7 @@ export type UIAppState = Omit<
   | "snapLines"
   | "originSnapOffset"
   | "suggestedBinding"
-  | "hoveredArrowTextAnchor"
+  | "textToolHover"
   | "frameToHighlight"
   | "elementsToHighlight"
 >;
@@ -1212,7 +1228,7 @@ export type AppClassProperties = {
   scene: App["scene"];
   syncActionResult: App["syncActionResult"];
   fonts: App["fonts"];
-  pasteFromClipboard: App["pasteFromClipboard"];
+  clipboard: App["clipboard"];
   id: App["id"];
   onInsertElements: App["onInsertElements"];
   onExportImage: App["onExportImage"];
@@ -1230,8 +1246,10 @@ export type AppClassProperties = {
   flowchart: App["flowchart"];
   drawShape: App["drawShape"];
   arrowText: App["arrowText"];
+  textTool: App["textTool"];
   cursor: App["cursor"];
   bucketFill: App["bucketFill"];
+  duplicate: App["duplicate"];
   toolDrag: App["toolDrag"];
   activeResizeHandle: App["activeResizeHandle"];
   isToolLocked: App["isToolLocked"];
@@ -1612,9 +1630,10 @@ export type ViewportOffsets = Offsets & {
 /**
  * Value of the `data-viewport-ui-name` attribute, identifying a
  * conditionally-rendered surface (marked with `data-viewport-ui`) so that
- * `getViewportOffsets` can reserve space for it while it's hidden (see the
- * `reserve` option). Whenever a named surface is rendered, its measured
- * footprint is remembered; reserving uses that remembered footprint, or an
- * approximate default if the surface hasn't been rendered yet.
+ * it can be measured on its own, and so that `getViewportOffsets` can
+ * reserve space for it while it's hidden (see the `reserve` option).
+ * Whenever a named surface is rendered, its measured footprint is
+ * remembered; reserving uses that remembered footprint, or an approximate
+ * default if the surface hasn't been rendered yet.
  */
-export type ViewportUIName = "sidebar" | "stylesPanel";
+export type ViewportUIName = "sidebar" | "stylesPanel" | "stats";
