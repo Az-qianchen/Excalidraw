@@ -149,6 +149,49 @@ export const GOOGLE_FONTS_RANGES = {
 /** local protocol to skip the local font from registering or inlining */
 export const LOCAL_FONT_PROTOCOL = "local:";
 
+// --------------------------------------------------------------------------
+// custom (user-dropped) fonts
+// --------------------------------------------------------------------------
+
+/** font-family ids allocated to dynamically registered custom fonts */
+const CUSTOM_FONT_FAMILY_ID_START = 10_000;
+
+const customFontFamilies = new Map<number, string>();
+
+/**
+ * Registers a custom font family (from a dropped font file) so that runtime
+ * lookups (`getFontFamilyString`, picker labels, metrics) resolve it.
+ *
+ * `FONT_FAMILY` / `FONT_METADATA` are static at build time, so we keep a
+ * side registry (ids `>= 10_000`, disjoint from built-ins & fallbacks).
+ */
+export const registerCustomFontFamily = (
+  fontFamilyId: number,
+  family: string,
+) => {
+  if (fontFamilyId < CUSTOM_FONT_FAMILY_ID_START) {
+    throw new Error(
+      `registerCustomFontFamily: id must be >= ${CUSTOM_FONT_FAMILY_ID_START}`,
+    );
+  }
+
+  customFontFamilies.set(fontFamilyId, family);
+
+  // reuse Excalifont metrics as a sane default (same as unknown families do)
+  if (!FONT_METADATA[fontFamilyId]) {
+    FONT_METADATA[fontFamilyId] = {
+      metrics: FONT_METADATA[FONT_FAMILY.Excalifont].metrics,
+    };
+  }
+};
+
+/** @returns the registered custom family name, if any */
+export const getCustomFontFamilyName = (fontFamilyId: number) =>
+  customFontFamilies.get(fontFamilyId);
+
+/** @returns all registered custom families (id → name) */
+export const getCustomFontFamilies = () => customFontFamilies;
+
 /**
  * Calculates vertical offset for a text with alphabetic baseline.
  */

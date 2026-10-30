@@ -349,6 +349,11 @@ import {
 } from "../components/hyperlink/Hyperlink";
 
 import { Fonts } from "../fonts";
+import {
+  isSupportedFontFile,
+  registerCustomFont,
+  restoreCustomFonts,
+} from "../fonts/CustomFonts";
 import { editorJotaiStore, type WritableAtom } from "../editor-jotai";
 import { ImageSceneDataError } from "../errors";
 import {
@@ -4172,7 +4177,26 @@ class App extends React.Component<AppProps, AppState> {
       // Obtain a file that was shared via the Web Share Target API.
       this.restoreFileFromShare();
     } else {
-      this.updateDOMRect(this.initializeScene);
+      // re-register user-dropped custom fonts from a previous session,
+      // before the scene (and its text elements using them) is restored
+      restoreCustomFonts(this.ownerDocument)
+        .then((count) => {
+          if (count) {
+            this.fonts.onLoaded(
+              Array.from(Fonts.registered.entries())
+                .filter(([id]) => id >= 10_000)
+                .flatMap(([_, { fontFaces }]) =>
+                  fontFaces.map(({ fontFace }) => fontFace),
+                ),
+            );
+          }
+        })
+        .catch((e) => {
+          console.warn("Failed to restore custom fonts", e);
+        })
+        .finally(() => {
+          this.updateDOMRect(this.initializeScene);
+        });
     }
 
     // note that this check seems to always pass in localhost
@@ -12121,6 +12145,57 @@ class App extends React.Component<AppProps, AppState> {
 
     if (imageFiles.length > 0 && this.isToolSupported("image")) {
       return this.insertImages(imageFiles, sceneX, sceneY);
+    }
+
+    // custom font files — register and select for future text elements
+    const fontFiles = fileItems
+      .map((data) => data.file)
+      .filter((file): file is File => !!file && isSupportedFontFile(file));
+
+    if (fontFiles.length > 0) {
+      const registered: number[] = [];
+      for (const fontFile of fontFiles) {
+        try {
+          registered.push(
+            await registerCustomFont(fontFile, this.ownerDocument),
+          );
+        } catch (e) {
+          console.error("Failed to register custom font", fontFile.name, e);
+          this.setToast({
+            message: t("fileDrop.fontLoadError", {
+              file: fontFile.name,
+            }),
+            closable: true,
+            duration: 5000,
+          });
+        }
+      }
+
+      if (registered.length) {
+        // rerender any text elements that already use these fonts
+        // (e.g. restored scene opened before the font was re-registered)
+        this.fonts.onLoaded(
+          registered.flatMap((id) =>
+            (Fonts.registered.get(id)?.fontFaces ?? []).map(
+              ({ fontFace }) => fontFace,
+            ),
+          ),
+        );
+
+        this.setState({ currentItemFontFamily: registered[0] });
+
+        this.setToast({
+          message: t("fileDrop.fontLoaded", {
+            family:
+              Fonts.registered.get(registered[0])?.fontFaces[0]?.fontFace
+                .family ?? registered[0],
+          }),
+          closable: true,
+          duration: 5000,
+        });
+      }
+
+      return;
     }
     const excalidrawLibrary_ids = dataTransferList.getData(
       MIME_TYPES.excalidrawlibIds,

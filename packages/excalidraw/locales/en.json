@@ -770,7 +770,9 @@
     "replaceHint": "Hold <shift>Shift</shift> to keep existing content",
     "keepHint": "Your existing content will be kept",
     "libraryHint": "Library files will append",
-    "replacedToast": "Content replaced. {{shortcut}} to undo"
+    "replacedToast": "Content replaced. {{shortcut}} to undo",
+    "fontLoaded": "Font \"{{family}}\" installed — now available in the font picker",
+    "fontLoadError": "Couldn't load font \"{{file}}\""
   },
   "mermaid": {
     "title": "Mermaid to Excalidraw",

@@ -16,9 +16,11 @@ import {
   DEFAULT_VERSION,
   ENV,
   FONT_FAMILY,
+  SANS_SERIF_GENERIC_FONT,
   getFontFamilyFallbacks,
   WINDOWS_EMOJI_FALLBACK_FONT,
 } from "./constants";
+import { getCustomFontFamilyName } from "./font-metadata";
 
 import type { MaybePromise, ResolutionType } from "./utility-types";
 
@@ -145,6 +147,11 @@ export const getFontFamilyString = ({
         .map((x) => `, ${x}`)
         .join("")}`;
     }
+  }
+  // dynamically registered custom font (dropped into the app)
+  const customFamily = getCustomFontFamilyName(fontFamily);
+  if (customFamily) {
+    return `${customFamily}, ${SANS_SERIF_GENERIC_FONT}, ${WINDOWS_EMOJI_FALLBACK_FONT}`;
   }
   return WINDOWS_EMOJI_FALLBACK_FONT;
 };

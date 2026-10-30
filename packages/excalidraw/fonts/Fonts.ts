@@ -426,7 +426,6 @@ export class Fonts {
         { metadata: FontMetadata; fontFaces: ExcalidrawFontFace[] }
       >(),
     };
-
     const init = (
       family: keyof typeof FONT_FAMILY | keyof typeof FONT_FAMILY_FALLBACKS,
       ...fontFacesDescriptors: ExcalidrawFontFaceDescriptor[]
@@ -460,6 +459,52 @@ export class Fonts {
     Fonts._initialized = true;
 
     return fonts.registered;
+  }
+
+  /**
+   * Registers a runtime-loaded custom font (user-dropped font file).
+   *
+   * Custom fonts bypass the `FONT_FAMILY` enum (ids >= 10_000) — they use an
+   * already-loaded `FontFace` instance, so they don't need `ExcalidrawFontFace`
+   * url fetching nor subsetting. Their `@font-face` inlining on SVG export is
+   * skipped (only PNG export is supported for custom fonts).
+   *
+   * @param familyId font-family id used on text elements (>= 10_000)
+   * @param family family name (also the `FontFace.family`)
+   * @param fontFace loaded font face to register
+   */
+  public static registerCustomFont(
+    familyId: number,
+    family: string,
+    fontFace: FontFace,
+  ) {
+    if (familyId < 10_000) {
+      throw new Error(`Fonts.registerCustomFont: id must be >= 10_000`);
+    }
+
+    // mock font-face from tests or host apps without `family` accessor
+    const face = fontFace as FontFace & { family?: string };
+    if (!face.family) {
+      face.family = family;
+    }
+
+    // wrap in a minimal ExcalidrawFontFace-like object, reusing the metadata
+    // shape so all existing consumers keep working (except SVG inlining, which
+    // checks the `local` flag and skips custom fonts as well)
+    Fonts.registered.set(familyId, {
+      metadata: {
+        // reuse Excalifont metrics (as `getLineHeight` fallback does)
+        metrics: FONT_METADATA[FONT_FAMILY.Excalifont].metrics,
+        // prevents SVG-export inlining from fetching urls it doesn't have
+        local: true,
+      },
+      fontFaces: [
+        {
+          fontFace,
+          urls: [],
+        } as unknown as ExcalidrawFontFace,
+      ],
+    });
   }
 
   /**
