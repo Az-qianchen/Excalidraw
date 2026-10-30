@@ -418,38 +418,9 @@ export const textWysiwyg = ({
             }
           }
 
-          // autogrow container height if text exceeds
-          if (!isArrowElement(container) && height > maxHeight) {
-            const targetContainerHeight = computeContainerDimensionForBoundText(
-              height,
-              container.type,
-            );
-
-            app.scene.mutateElement(container, {
-              height: targetContainerHeight,
-            });
-            updateBoundElements(container, app.scene, {
-              renderEnvironment: app.renderEnvironment,
-            });
-            return;
-          } else if (
-            // autoshrink container height until original container height
-            // is reached when text is removed
-            !isArrowElement(container) &&
-            container.height > originalContainerData.height &&
-            height < maxHeight
-          ) {
-            const targetContainerHeight = computeContainerDimensionForBoundText(
-              height,
-              container.type,
-            );
-            app.scene.mutateElement(container, {
-              height: targetContainerHeight,
-            });
-            updateBoundElements(container, app.scene, {
-              renderEnvironment: app.renderEnvironment,
-            });
-          } else {
+          // 编辑文字（含超出、字体属性变化）不改变容器大小
+          // （feat：输入文字不改变图形大小）。仅调整编辑器位置。
+          if (!isArrowElement(container)) {
             const { x, y } = computeBoundTextPosition(
               container,
               updatedTextElement as ExcalidrawTextElementWithContainer,

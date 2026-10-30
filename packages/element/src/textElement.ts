@@ -16,7 +16,10 @@ import { pointFrom, pointRotateRads, type Radians } from "@excalidraw/math";
 
 import type { ExtractSetType } from "@excalidraw/common/utility-types";
 
-import { resetOriginalContainerCache } from "./containerCache";
+import {
+  resetOriginalContainerCache,
+  updateOriginalContainerCache,
+} from "./containerCache";
 import { LinearElementEditor } from "./linearElementEditor";
 import { getPositionAfterHeightChange } from "./sizeHelpers";
 
@@ -257,6 +260,13 @@ export const redrawTextBoundingBox = (
   container: ExcalidrawElement | null,
   scene: Scene,
   renderEnvironment?: RenderEnvironment,
+  /**
+   * grow the container when the (re)bound label does not fit. Only set for
+   * programmatic restoration (delta application restoring a deleted label) —
+   * interactive editing paths (wysiwyg, font actions) intentionally keep the
+   * container size unchanged (feat：输入文字不改变图形大小).
+   */
+  growContainer?: boolean,
 ) => {
   const elementsMap = scene.getNonDeletedElementsMap();
 
@@ -321,6 +331,33 @@ export const redrawTextBoundingBox = (
   boundTextUpdates.height = metrics.height;
 
   if (container) {
+    // grow the container only on programmatic restoration (see the
+    // `growContainer` doc above)
+    if (growContainer) {
+      const maxContainerHeight = getBoundTextMaxHeight(
+        container,
+        textElement as ExcalidrawTextElementWithContainer,
+      );
+      const maxContainerWidth = getBoundTextMaxWidth(container, textElement);
+
+      if (!isArrowElement(container) && metrics.height > maxContainerHeight) {
+        const nextHeight = computeContainerDimensionForBoundText(
+          metrics.height,
+          container.type,
+        );
+        scene.mutateElement(container, { height: nextHeight });
+        updateOriginalContainerCache(container.id, nextHeight);
+      }
+
+      if (metrics.width > maxContainerWidth) {
+        const nextWidth = computeContainerDimensionForBoundText(
+          metrics.width,
+          container.type,
+        );
+        scene.mutateElement(container, { width: nextWidth });
+      }
+    }
+
     const updatedTextElement = {
       ...textElement,
       ...boundTextUpdates,

@@ -2142,7 +2142,15 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         continue;
       }
 
-      redrawTextBoundingBox(boundText, container, scene, renderEnvironment);
+      redrawTextBoundingBox(
+        boundText,
+        container,
+        scene,
+        renderEnvironment,
+        // restoring a (re)bound label (e.g. from a collaborative delta)
+        // re-fits the container so the label is not clipped
+        true,
+      );
     }
   }
 

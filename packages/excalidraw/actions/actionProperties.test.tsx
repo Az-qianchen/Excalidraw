@@ -30,11 +30,27 @@ describe("element locking", () => {
       API.setAppState({
         currentItemBackgroundColor: color,
       });
-      const activeColor = queryByTestId(
-        document.body,
-        `color-top-pick-${color}`,
-      );
-      expect(activeColor).toHaveClass("active");
+      // stroke and background pickers both render top-picks strips
+      // (both include white), so scope the query to the background picker.
+      // The full styles panel precedes each picker with an <h3> heading
+      // ("Background" / "Stroke"); the container itself is its sibling.
+      const activeColor = [
+        ...document.body.querySelectorAll(
+          `[data-testid="color-top-pick-${color}"]`,
+        ),
+      ].find((el) => {
+        const container = el.closest(".color-picker-container");
+        if (!container) {
+          return false;
+        }
+        const heading = container.previousElementSibling;
+        return (
+          container.classList.contains("color-picker-container") &&
+          el.classList.contains("active") &&
+          heading?.textContent?.match(/background/i)
+        );
+      });
+      expect(activeColor).toBeDefined();
     });
 
     it("should show fill style when background non-transparent", () => {
