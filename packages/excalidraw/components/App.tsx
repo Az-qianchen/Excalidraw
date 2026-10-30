@@ -4177,8 +4177,12 @@ class App extends React.Component<AppProps, AppState> {
       // Obtain a file that was shared via the Web Share Target API.
       this.restoreFileFromShare();
     } else {
-      // re-register user-dropped custom fonts from a previous session,
-      // before the scene (and its text elements using them) is restored
+      this.updateDOMRect(this.initializeScene);
+
+      // re-register user-dropped custom fonts from a previous session.
+      // Runs in the background — never block scene initialization on it
+      // (fonts use `display: swap` and trigger a rerender via
+      // `fonts.onLoaded` once available).
       restoreCustomFonts(this.ownerDocument)
         .then((count) => {
           if (count) {
@@ -4193,9 +4197,6 @@ class App extends React.Component<AppProps, AppState> {
         })
         .catch((e) => {
           console.warn("Failed to restore custom fonts", e);
-        })
-        .finally(() => {
-          this.updateDOMRect(this.initializeScene);
         });
     }
 
