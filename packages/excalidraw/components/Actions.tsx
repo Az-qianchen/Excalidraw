@@ -209,6 +209,8 @@ export const SelectedShapeActions = ({
       {predicates.arrowheads && <>{renderAction("changeArrowhead")}</>}
 
       {predicates.opacity && renderAction("changeOpacity")}
+      {/* fork: 文字/图片外发光设置 */}
+      {renderAction("changeOuterGlow")}
 
       {predicates.layers && <LayersFieldset renderAction={renderAction} />}
 
@@ -364,6 +366,8 @@ const CombinedShapeProperties = ({
               {predicates.sloppiness && <>{renderAction("changeSloppiness")}</>}
               {predicates.roundness && renderAction("changeRoundness")}
               {predicates.opacity && renderAction("changeOpacity")}
+              {/* fork: 文字/图片外发光设置 */}
+              {renderAction("changeOuterGlow")}
             </div>
           </PropertiesPopover>
         )}

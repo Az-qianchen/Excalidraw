@@ -116,13 +116,22 @@ const isPendingImageElement = (
   isInitializedImageElement(element) &&
   !renderConfig.imageCache.has(element.fileId);
 
+/** 外发光宽度滑杆的最大值（actionProperties 的 Range max） */
+const OUTER_GLOW_MAX_WIDTH = 60;
+
 const getCanvasPadding = (element: ExcalidrawElement) => {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
   const glowPadding = element.outerGlow?.enabled
-    ? // 硬边外扩半径 = width（描边居中），软发光模糊半径 = width。
-      // padding 需匹配 canvas 像素，而发光半径在 canvas 上为
-      // width * dpr * scale，取 2 倍 width * dpr 确保不裁边
-      (element.outerGlow.width * 2 + (element.strokeWidth ?? 0)) * dpr
+    ? // 固定 padding，与当前发光宽度无关（按宽度滑杆最大值预留）：
+      // padding 随宽度连续变化时，位图尺寸与内容在位图内的偏移
+      // （padding × zoom）逐档变化，非整数 zoom 下内容每档落在不同的
+      // 亚像素相位上重新光栅化，抗锯齿逐档跳变，表现为调整宽度时
+      // 元素抖动。固定 padding 后调宽度只改变光晕像素，位图几何与
+      // 光栅化相位完全不变。半径校验：位图上光晕半径 = width·dpr·zoom，
+      // 内容留白 = padding·zoom，需 padding ≥ 60·dpr，恒成立。
+      Math.ceil(
+        (OUTER_GLOW_MAX_WIDTH * 2 + (element.strokeWidth ?? 0)) * dpr,
+      )
     : 0;
   const base = (() => {
     switch (element.type) {
